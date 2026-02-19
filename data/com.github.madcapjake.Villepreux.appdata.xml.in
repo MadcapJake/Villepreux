@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.github.madcapjake.Villepreux</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Villepreux</name>
+  <summary>Manage aquarium husbandry</summary>
+  <description>
+    <p>Villepreux is a native Linux desktop application designed to manage aquarium husbandry.</p>
+  </description>
+  <launchable type="desktop-id">com.github.madcapjake.Villepreux.desktop</launchable>
+  <url type="homepage">https://github.com/madcapjake/villepreux</url>
+</component>

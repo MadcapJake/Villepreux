@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Villepreux
+Comment=Track your aquarium ecosystem
+Type=Application
+Exec=villepreux
+Terminal=false
+Categories=GTK;GNOME;Utility;
+Keywords=Aquarium;Fish;Tank;
+Icon=com.github.madcapjake.Villepreux
+StartupNotify=true

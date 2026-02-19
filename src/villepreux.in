@@ -1,0 +1,23 @@
+#!@GJS@ -m
+
+import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
+import system from 'system';
+
+try {
+    const pkgdatadir = '@pkgdatadir@';
+    
+    // Explicitly load the GResource bundle
+    const resourceFile = GLib.build_filenamev([pkgdatadir, 'villepreux.gresource']);
+    const resource = Gio.Resource.load(resourceFile);
+    resource._register();
+
+    // Dynamically import the main module to ensure resource is registered first
+    const { main } = await import('resource:///com/github/madcapjake/Villepreux/main.js');
+
+    // Run the application
+    await main(system.programArgs);
+} catch (e) {
+    console.error('Failed to start application:', e);
+    system.exit(1);
+}

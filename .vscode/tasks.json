@@ -1,0 +1,44 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Flatpak",
+            "type": "shell",
+            "command": "flatpak-builder --user --install --install-deps-from=flathub --force-clean build-dir com.github.madcapjake.Villepreux.json",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "Run Flatpak",
+            "type": "shell",
+            "command": "flatpak run com.github.madcapjake.Villepreux",
+            "group": "test",
+            "dependsOn": "Build Flatpak",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "Clean Build Directory",
+            "type": "shell",
+            "command": "rm -rf build-dir",
+            "problemMatcher": []
+        }
+    ]
+}
