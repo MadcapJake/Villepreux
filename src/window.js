@@ -19,27 +19,80 @@ export const VillepreuxWindow = GObject.registerClass(
         }
 
         _setupUI() {
-            // Main layout container: NavigationSplitView
+            // Main layout container: OverlaySplitView (Better for collapsible sidebar)
+            this._splitView = new Adw.OverlaySplitView({
+                min_sidebar_width: 250,
+                max_sidebar_width: 300,
+                sidebar_position: Gtk.PackType.START,
+            });
 
-            // Sidebar (Navigation Rail / List)
+            // --- Sidebar Setup ---
+            const sidebarContent = new Adw.ToolbarView();
+
+            // Sidebar Header
+            const sidebarHeader = new Adw.HeaderBar({
+                title_widget: new Gtk.Label({ label: 'Tanks', css_classes: ['title'] }),
+                show_end_title_buttons: false, // Clean look for sidebar
+                show_start_title_buttons: false
+            });
+
+            // Add Tank Button (Sidebar)
+            const addTankBtn = new Gtk.Button({
+                icon_name: 'list-add-symbolic',
+                tooltip_text: 'Add Tank'
+            });
+            addTankBtn.connect('clicked', () => {
+                const dialog = new AddTankDialog(this);
+                dialog.connect('tank-added', () => {
+                    this._refreshTankList();
+                });
+                dialog.present();
+            });
+            sidebarHeader.pack_end(addTankBtn);
+
+            sidebarContent.add_top_bar(sidebarHeader);
+
+            // Tank List
             this._tanksList = new Gtk.ListBox({
                 css_classes: ['navigation-sidebar'],
             });
-
-            const sidebarContent = new Adw.ToolbarView();
-            const sidebarHeader = new Adw.HeaderBar({ title_widget: new Gtk.Label({ label: 'Tanks', css_classes: ['title'] }) });
-            sidebarContent.add_top_bar(sidebarHeader);
-            sidebarContent.set_content(this._tanksList);
-
-            const sidebarPage = new Adw.NavigationPage({
-                title: 'Tanks',
-                child: sidebarContent,
-                tag: 'sidebar',
+            this._tanksList.connect('row-activated', (box, row) => {
+                this._onTankSelected(row.tank);
             });
 
-            // Content Area (Main View) - Zero State initially
+            // Wrap list in ScrolledWindow
+            const scrolledList = new Gtk.ScrolledWindow({
+                hscrollbar_policy: Gtk.PolicyType.NEVER,
+                child: this._tanksList
+            });
+            sidebarContent.set_content(scrolledList);
+
+            this._splitView.set_sidebar(sidebarContent);
+
+
+            // --- Content Setup ---
             this._contentView = new Adw.ToolbarView();
+
+            // Content Header
             const contentHeader = new Adw.HeaderBar();
+
+            // Sidebar Toggle Button (Content)
+            const toggleSidebarBtn = new Gtk.Button({
+                icon_name: 'sidebar-show-symbolic',
+                tooltip_text: 'Toggle Sidebar'
+            });
+            // Bind button visibility/action to split view state
+            toggleSidebarBtn.connect('clicked', () => {
+                this._splitView.set_show_sidebar(!this._splitView.show_sidebar);
+            });
+
+            // Only show toggle button when collapsed (optional, but good UX)
+            // Or always show it if we want desktop collapse. 
+            // For now, let's keep it simple: always visible if we allow desktop collapse, 
+            // but standard 'Libadwaita' mostly shows it when collapsed.
+            // Let's bind it to behave like a standard overlay toggle.
+
+            contentHeader.pack_start(toggleSidebarBtn);
             this._contentView.add_top_bar(contentHeader);
 
             this._statusPage = new Adw.StatusPage({
@@ -50,30 +103,23 @@ export const VillepreuxWindow = GObject.registerClass(
             });
 
             this._contentView.set_content(this._statusPage);
+            this._splitView.set_content(this._contentView);
 
-            const contentPage = new Adw.NavigationPage({
-                title: 'Welcome',
-                child: this._contentView,
-                tag: 'content',
-            });
-
-            const splitView = new Adw.NavigationSplitView({
-                sidebar: sidebarPage,
-                content: contentPage,
-            });
-
+            // --- Breakpoints (Responsive) ---
             const breakpoint = new Adw.Breakpoint({
                 condition: Adw.BreakpointCondition.new_length(
                     Adw.BreakpointConditionLengthType.MAX_WIDTH,
-                    600,
+                    700,
                     Adw.LengthUnit.PX
                 ),
             });
 
-            breakpoint.add_setter(splitView, 'collapsed', true);
+            // When narrow, enable collapsing behavior automatically handled by OverlaySplitView?
+            // OverlaySplitView has 'collapsed' property.
+            breakpoint.add_setter(this._splitView, 'collapsed', true);
             this.add_breakpoint(breakpoint);
 
-            this.content = splitView;
+            this.content = this._splitView;
 
             // Initial load
             this._refreshTankList();
@@ -112,23 +158,37 @@ export const VillepreuxWindow = GObject.registerClass(
                         title: tank.name,
                         subtitle: `${tank.volume}L - ${tank.type}`,
                     });
+                    // Store tank data on the row for retrieval on click
+                    row.tank = tank;
                     this._tanksList.append(row);
                 });
 
-                // Update content view to show dashboard (placeholder for now)
+                // If currently showing status page, switch to dashboard of first tank
                 if (this._contentView.content === this._statusPage) {
-                    const dashboardLabel = new Gtk.Label({
-                        label: `Dashboard for ${tanks[0].name}`,
-                        halign: Gtk.Align.CENTER,
-                        valign: Gtk.Align.CENTER
-                    });
-                    this._contentView.set_content(dashboardLabel);
+                    this._onTankSelected(tanks[0]);
                 }
             } else {
                 // Ensure zero state
                 if (this._contentView.content !== this._statusPage) {
                     this._contentView.set_content(this._statusPage);
                 }
+            }
+        }
+
+        _onTankSelected(tank) {
+            // Update content view with Dashboard for 'tank'
+            const dashboardLabel = new Gtk.Label({
+                label: `Dashboard for ${tank.name}\nVolume: ${tank.volume}L`,
+                halign: Gtk.Align.CENTER,
+                valign: Gtk.Align.CENTER,
+                css_classes: ['title-1']
+            });
+
+            this._contentView.set_content(dashboardLabel);
+
+            // If on mobile (collapsed), hide sidebar automatically
+            if (this._splitView.collapsed) {
+                this._splitView.show_sidebar = false;
             }
         }
     }
