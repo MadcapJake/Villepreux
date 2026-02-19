@@ -5,5 +5,9 @@
     <file>window.js</file>
     <file>database.js</file>
     <file>views/AddTankDialog.js</file>
+    <file>views/DashboardView.js</file>
+    <file>views/ParameterView.js</file>
+    <file>views/LivestockView.js</file>
+    <file>views/TaskView.js</file>
   </gresource>
 </gresources>

@@ -3,6 +3,7 @@ import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
 
 import { AddTankDialog } from './views/AddTankDialog.js';
+import { DashboardView } from './views/DashboardView.js';
 import { getTanks } from './database.js';
 
 export const VillepreuxWindow = GObject.registerClass(
@@ -177,14 +178,8 @@ export const VillepreuxWindow = GObject.registerClass(
 
         _onTankSelected(tank) {
             // Update content view with Dashboard for 'tank'
-            const dashboardLabel = new Gtk.Label({
-                label: `Dashboard for ${tank.name}\nVolume: ${tank.volume}L`,
-                halign: Gtk.Align.CENTER,
-                valign: Gtk.Align.CENTER,
-                css_classes: ['title-1']
-            });
-
-            this._contentView.set_content(dashboardLabel);
+            const dashboard = new DashboardView(tank);
+            this._contentView.set_content(dashboard);
 
             // If on mobile (collapsed), hide sidebar automatically
             if (this._splitView.collapsed) {
