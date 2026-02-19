@@ -25,20 +25,7 @@ export const ParameterView = GObject.registerClass(
                 spacing: 24,
             });
 
-            // Title
-            const title = new Gtk.Label({
-                label: 'Water Parameters',
-                css_classes: ['title-2'],
-                halign: Gtk.Align.START,
-            });
-            mainBox.append(title);
 
-            // Log New Parameter Button/Group (Placeholder)
-            const logGroup = new Adw.PreferencesGroup({
-                title: 'Log New Test',
-            });
-            // We'll add input fields here later
-            mainBox.append(logGroup);
 
             // Charts Grid (Adaptive)
             // We'll use a FlowBox to adapt between single and multi-column

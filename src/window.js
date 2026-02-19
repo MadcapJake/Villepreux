@@ -75,7 +75,7 @@ export const VillepreuxWindow = GObject.registerClass(
             this._contentView = new Adw.ToolbarView();
 
             // Content Header
-            const contentHeader = new Adw.HeaderBar();
+            this._contentHeader = new Adw.HeaderBar();
 
             // Sidebar Toggle Button (Content)
             const toggleSidebarBtn = new Gtk.Button({
@@ -87,14 +87,8 @@ export const VillepreuxWindow = GObject.registerClass(
                 this._splitView.set_show_sidebar(!this._splitView.show_sidebar);
             });
 
-            // Only show toggle button when collapsed (optional, but good UX)
-            // Or always show it if we want desktop collapse. 
-            // For now, let's keep it simple: always visible if we allow desktop collapse, 
-            // but standard 'Libadwaita' mostly shows it when collapsed.
-            // Let's bind it to behave like a standard overlay toggle.
-
-            contentHeader.pack_start(toggleSidebarBtn);
-            this._contentView.add_top_bar(contentHeader);
+            this._contentHeader.pack_start(toggleSidebarBtn);
+            this._contentView.add_top_bar(this._contentHeader);
 
             this._statusPage = new Adw.StatusPage({
                 title: 'Welcome to Villepreux',
@@ -171,6 +165,12 @@ export const VillepreuxWindow = GObject.registerClass(
             } else {
                 // Ensure zero state
                 if (this._contentView.content !== this._statusPage) {
+                    // Remove bottom bar if present
+                    if (this._viewSwitcherBar) {
+                        this._contentView.remove(this._viewSwitcherBar);
+                        this._viewSwitcherBar = null;
+                        this._updateHeaderButtons(null);
+                    }
                     this._contentView.set_content(this._statusPage);
                 }
             }
@@ -181,9 +181,71 @@ export const VillepreuxWindow = GObject.registerClass(
             const dashboard = new DashboardView(tank);
             this._contentView.set_content(dashboard);
 
+            // Setup Bottom View Switcher
+            if (this._viewSwitcherBar) {
+                this._contentView.remove(this._viewSwitcherBar);
+            }
+
+            this._viewSwitcherBar = new Adw.ViewSwitcherBar({
+                stack: dashboard.stack,
+                reveal: true,
+            });
+            this._contentView.add_bottom_bar(this._viewSwitcherBar);
+
+            // Connect signal for dynamic header buttons
+            dashboard.stack.connect('notify::visible-child', () => {
+                this._updateHeaderButtons(dashboard.stack);
+            });
+
+            // Initial button update
+            this._updateHeaderButtons(dashboard.stack);
+
             // If on mobile (collapsed), hide sidebar automatically
             if (this._splitView.collapsed) {
                 this._splitView.show_sidebar = false;
+            }
+        }
+
+        _updateHeaderButtons(stack) {
+            // Clear existing end buttons
+            // Note: In GTK4/Adw there isn't a direct "clear_end" method conveniently exposed without iterating.
+            // We'll rely on keeping a reference to the active button and removing it.
+
+            if (this._activeHeaderButton) {
+                this._contentHeader.remove(this._activeHeaderButton);
+                this._activeHeaderButton = null;
+            }
+
+            if (!stack) return;
+
+            const visibleChild = stack.visible_child;
+            const visibleName = stack.get_visible_child_name();
+
+            let btn = null;
+
+            if (visibleName === 'parameters') {
+                btn = new Gtk.Button({
+                    label: 'Add Test Result',
+                    css_classes: ['suggested-action'],
+                });
+                // btn.connect('clicked', ...)
+            } else if (visibleName === 'livestock') {
+                btn = new Gtk.Button({
+                    label: 'Add Inhabitant',
+                    css_classes: ['suggested-action'],
+                });
+                // btn.connect('clicked', ...)
+            } else if (visibleName === 'tasks') {
+                btn = new Gtk.Button({
+                    label: 'Add Task',
+                    css_classes: ['suggested-action'],
+                });
+                // btn.connect('clicked', ...)
+            }
+
+            if (btn) {
+                this._contentHeader.pack_end(btn);
+                this._activeHeaderButton = btn;
             }
         }
     }

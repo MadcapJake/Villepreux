@@ -25,13 +25,6 @@ export const TaskView = GObject.registerClass(
                 spacing: 24,
             });
 
-            const title = new Gtk.Label({
-                label: 'Maintenance Tasks',
-                css_classes: ['title-2'],
-                halign: Gtk.Align.START,
-            });
-            mainBox.append(title);
-
             // Tasks List
             const tasksGroup = new Adw.PreferencesGroup();
 

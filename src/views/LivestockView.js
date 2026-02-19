@@ -26,26 +26,7 @@ export const LivestockView = GObject.registerClass(
             });
 
             // Header
-            const headerBox = new Gtk.Box({
-                orientation: Gtk.Orientation.HORIZONTAL,
-                spacing: 12,
-            });
-
-            const title = new Gtk.Label({
-                label: 'Livestock',
-                css_classes: ['title-2'],
-                halign: Gtk.Align.START,
-                hexpand: true,
-            });
-
-            const addBtn = new Gtk.Button({
-                label: 'Add Inhabitant',
-                css_classes: ['suggested-action'],
-            });
-
-            headerBox.append(title);
-            headerBox.append(addBtn);
-            mainBox.append(headerBox);
+            // Removed as per request (Add button moved to header bar)
 
             // Livestock Grid (FlowBox for adaptive layout)
             const flowBox = new Gtk.FlowBox({
