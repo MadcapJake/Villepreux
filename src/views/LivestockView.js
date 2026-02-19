@@ -31,8 +31,8 @@ export const LivestockView = GObject.registerClass(
             // Livestock Grid (FlowBox for adaptive layout)
             const flowBox = new Gtk.FlowBox({
                 valign: Gtk.Align.START,
-                max_children_per_line: 3,
-                min_children_per_line: 1,
+                min_children_per_line: 1, // Allow down to 1 column
+                max_children_per_line: 10, // Allow more columns on wide screens
                 selection_mode: Gtk.SelectionMode.NONE,
                 column_spacing: 12,
                 row_spacing: 12,
@@ -55,7 +55,7 @@ export const LivestockView = GObject.registerClass(
                 orientation: Gtk.Orientation.VERTICAL,
                 spacing: 6,
                 css_classes: ['card', 'p-12'],
-                width_request: 160,
+                width_request: 175,
             });
 
             const icon = new Gtk.Image({

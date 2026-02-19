@@ -27,12 +27,22 @@ export const ParameterView = GObject.registerClass(
 
 
 
+            // Add Parameter Button
+            const addParamBtn = new Gtk.Button({
+                label: 'Add Parameter',
+                icon_name: 'list-add-symbolic',
+                halign: Gtk.Align.END,
+                css_classes: ['flat'],
+            });
+            // addParamBtn.connect('clicked', ...)
+            mainBox.append(addParamBtn);
+
             // Charts Grid (Adaptive)
             // We'll use a FlowBox to adapt between single and multi-column
             const flowBox = new Gtk.FlowBox({
                 valign: Gtk.Align.START,
-                max_children_per_line: 2,
-                min_children_per_line: 1,
+                min_children_per_line: 1, // Allow down to 1 column
+                max_children_per_line: 10, // Allow more columns on wide screens
                 selection_mode: Gtk.SelectionMode.NONE,
                 column_spacing: 12,
                 row_spacing: 12,
@@ -60,7 +70,7 @@ export const ParameterView = GObject.registerClass(
                 spacing: 12,
                 css_classes: ['card', 'p-12'],
                 height_request: 200, // Placeholder height for chart
-                width_request: 340, // Minimum width for responsiveness
+                width_request: 260, // Minimum width for responsiveness, fits mobile
             });
 
             const label = new Gtk.Label({
