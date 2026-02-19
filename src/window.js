@@ -207,7 +207,7 @@ export const VillepreuxWindow = GObject.registerClass(
         }
 
         _updateHeaderButtons(stack) {
-            // Clear existing end buttons
+            // -- Clear existing end buttons --
             // Note: In GTK4/Adw there isn't a direct "clear_end" method conveniently exposed without iterating.
             // We'll rely on keeping a reference to the active button and removing it.
 
@@ -215,12 +215,18 @@ export const VillepreuxWindow = GObject.registerClass(
                 this._contentHeader.remove(this._activeHeaderButton);
                 this._activeHeaderButton = null;
             }
+            // -- Clear existing back button (start) --
+            if (this._backButton) {
+                this._contentHeader.remove(this._backButton);
+                this._backButton = null;
+            }
 
             if (!stack) return;
 
             const visibleChild = stack.visible_child;
             const visibleName = stack.get_visible_child_name();
 
+            // -- Add Action Button --
             let btn = null;
 
             if (visibleName === 'parameters') {
@@ -246,6 +252,41 @@ export const VillepreuxWindow = GObject.registerClass(
             if (btn) {
                 this._contentHeader.pack_end(btn);
                 this._activeHeaderButton = btn;
+            }
+
+            // -- Handle Back Button for NavigationView --
+            // Refactored to check for composition pattern (views exposing .navigationView)
+
+            if (visibleChild.navigationView) {
+                const navView = visibleChild.navigationView;
+
+                // Create Back Button
+                const backBtn = new Gtk.Button({
+                    icon_name: 'go-previous-symbolic',
+                    tooltip_text: 'Back',
+                });
+
+                // Visibility Logic
+                const updateBackBtn = () => {
+                    if (navView.visible_page && navView.visible_page.tag !== 'root') {
+                        backBtn.visible = true;
+                    } else {
+                        backBtn.visible = false;
+                    }
+                };
+
+                backBtn.connect('clicked', () => {
+                    navView.pop();
+                });
+
+                // Signals
+                const sig1 = navView.connect('pushed', updateBackBtn);
+                const sig2 = navView.connect('popped', updateBackBtn);
+                // Also update immediately
+                updateBackBtn();
+
+                this._contentHeader.pack_start(backBtn);
+                this._backButton = backBtn;
             }
         }
     }

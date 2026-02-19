@@ -8,6 +8,14 @@ export const ParameterView = GObject.registerClass(
             super._init();
             this.tank = tank;
 
+            this._navView = new Adw.NavigationView();
+
+            // --- Root Page (Grid) ---
+            const rootPage = new Adw.NavigationPage({
+                title: 'Parameters',
+                tag: 'root',
+            });
+
             const scroll = new Gtk.ScrolledWindow({
                 hscrollbar_policy: Gtk.PolicyType.NEVER,
             });
@@ -25,52 +33,51 @@ export const ParameterView = GObject.registerClass(
                 spacing: 24,
             });
 
-
-
-            // Add Parameter Button
-            const addParamBtn = new Gtk.Button({
-                label: 'Add Parameter',
-                icon_name: 'list-add-symbolic',
-                halign: Gtk.Align.END,
-                css_classes: ['flat'],
-            });
-            // addParamBtn.connect('clicked', ...)
-            mainBox.append(addParamBtn);
-
-            // Charts Grid (Adaptive)
-            // We'll use a FlowBox to adapt between single and multi-column
+            // Charts Grid
             const flowBox = new Gtk.FlowBox({
                 valign: Gtk.Align.START,
-                min_children_per_line: 1, // Allow down to 1 column
-                max_children_per_line: 10, // Allow more columns on wide screens
+                min_children_per_line: 1,
+                max_children_per_line: 10,
                 selection_mode: Gtk.SelectionMode.NONE,
                 column_spacing: 12,
                 row_spacing: 12,
             });
 
-            // Enable sorting/filtering if needed, or just let it flow.
-            // Responsive behavior: Adw.Clamp handles the width constraints.
-            // FlowBox adjusts columns based on available width.
-
-            // Add dummy charts
+            // Dummy charts
             ['pH', 'Temperature', 'Nitrate', 'Salinity'].forEach(param => {
-                flowBox.append(this._createChartCard(param));
+                const card = this._createChartCard(param);
+                flowBox.append(card);
             });
 
-            mainBox.append(flowBox);
+            // "Add Parameter" Card (Last item)
+            const addCard = this._createAddCard();
+            flowBox.append(addCard);
 
+            mainBox.append(flowBox);
             clamp.set_child(mainBox);
             scroll.set_child(clamp);
-            this.set_child(scroll);
+            rootPage.set_child(scroll);
+
+            this._navView.add(rootPage);
+            this.set_child(this._navView);
+        }
+
+        get navigationView() {
+            return this._navView;
         }
 
         _createChartCard(title) {
+            // We wrap the card content in a Button to make it clickable
+            const button = new Gtk.Button({
+                css_classes: ['card', 'flat'], // flat to avoid double borders details
+            });
+
             const card = new Gtk.Box({
                 orientation: Gtk.Orientation.VERTICAL,
                 spacing: 12,
-                css_classes: ['card', 'p-12'],
-                height_request: 200, // Placeholder height for chart
-                width_request: 260, // Minimum width for responsiveness, fits mobile
+                css_classes: ['p-12'], // padding applied to inner box
+                height_request: 200,
+                width_request: 260,
             });
 
             const label = new Gtk.Label({
@@ -88,7 +95,67 @@ export const ParameterView = GObject.registerClass(
 
             card.append(label);
             card.append(placeholder);
-            return card;
+            button.set_child(card);
+
+            button.connect('clicked', () => {
+                this._navigateToDetail(title);
+            });
+
+            return button;
+        }
+
+        _createAddCard() {
+            const button = new Gtk.Button({
+                css_classes: ['card', 'flat'],
+                height_request: 200,
+                width_request: 260,
+            });
+
+            const card = new Gtk.Box({
+                orientation: Gtk.Orientation.VERTICAL,
+                spacing: 12,
+                css_classes: ['p-12'],
+                valign: Gtk.Align.CENTER,
+                halign: Gtk.Align.CENTER,
+            });
+
+            const icon = new Gtk.Image({
+                icon_name: 'list-add-symbolic',
+                pixel_size: 48,
+                css_classes: ['dim-label'],
+                halign: Gtk.Align.CENTER,
+                valign: Gtk.Align.CENTER,
+            });
+
+            const label = new Gtk.Label({
+                label: 'Add Parameter',
+                css_classes: ['heading', 'dim-label'],
+                halign: Gtk.Align.CENTER,
+                valign: Gtk.Align.CENTER,
+            });
+
+            card.append(icon);
+            card.append(label);
+            button.set_child(card);
+
+            // Connect to action (e.g., show dialog)
+            // button.connect('clicked', ...)
+            return button;
+        }
+
+        _navigateToDetail(paramName) {
+            const detailPage = new Adw.NavigationPage({
+                title: paramName,
+                tag: 'detail',
+            });
+
+            const content = new Gtk.Label({
+                label: `Detail View for ${paramName}`,
+                css_classes: ['title-1'],
+            });
+
+            detailPage.set_child(content);
+            this._navView.push(detailPage);
         }
     }
 );
