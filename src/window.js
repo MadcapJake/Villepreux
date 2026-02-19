@@ -93,7 +93,7 @@ export const VillepreuxWindow = GObject.registerClass(
             this._statusPage = new Adw.StatusPage({
                 title: 'Welcome to Villepreux',
                 description: "You haven't created a tank yet. Start tracking your ecosystem today.",
-                icon_name: 'aquarium-symbolic',
+                icon_name: 'folder-new-symbolic',
                 child: this._createZeroStateButton(),
             });
 
@@ -177,6 +177,7 @@ export const VillepreuxWindow = GObject.registerClass(
         }
 
         _onTankSelected(tank) {
+            console.log(`[Window] Selected Tank: ${tank.name} (ID: ${tank.id})`);
             // Update content view with Dashboard for 'tank'
             const dashboard = new DashboardView(tank);
             this._contentView.set_content(dashboard);

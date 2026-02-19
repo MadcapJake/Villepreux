@@ -57,6 +57,7 @@ export const ParameterView = GObject.registerClass(
         }
 
         _refreshGrid() {
+            console.log(`[ParameterView] Refreshing grid for tank: ${this.tank.id}`);
             this._flowBox.remove_all();
 
             const defs = DB.getParameterDefinitions(this.tank.id);

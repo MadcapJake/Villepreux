@@ -10,6 +10,7 @@ export const DashboardView = GObject.registerClass(
     class DashboardView extends Adw.Bin {
         _init(tank) {
             super._init();
+            console.log(`[DashboardView] Initializing for tank: ${tank.id}`);
             this.tank = tank;
 
             this._stack = new Adw.ViewStack();

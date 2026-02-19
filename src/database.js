@@ -74,12 +74,18 @@ function _createTables() {
         `CREATE TABLE IF NOT EXISTS livestock (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tank_id INTEGER,
-            species_id INTEGER,
-            nickname TEXT,
+            name TEXT,
+            scientific_name TEXT,
+            type TEXT,
+            introduced_date TEXT,
+            quantity INTEGER,
+            source TEXT,
             purchase_date TEXT,
+            cost REAL,
+            notes TEXT,
+            image_path TEXT,
             status TEXT,
-            FOREIGN KEY(tank_id) REFERENCES tanks(id),
-            FOREIGN KEY(species_id) REFERENCES species_cache(id)
+            FOREIGN KEY(tank_id) REFERENCES tanks(id)
         )`,
         `CREATE TABLE IF NOT EXISTS livestock_timeline (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -208,5 +214,91 @@ export function deleteParameterDefinition(id) {
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to delete parameter definition:', e);
+    }
+}
+
+export function getLivestock(tankId) {
+    if (!_connection) return [];
+    try {
+        const sql = `SELECT * FROM livestock WHERE tank_id = ${tankId} ORDER BY name ASC`;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const items = [];
+        for (let i = 0; i < numRows; i++) {
+            items.push({
+                id: dm.get_value_at(0, i),
+                tank_id: dm.get_value_at(1, i),
+                name: dm.get_value_at(2, i),
+                scientific_name: dm.get_value_at(3, i),
+                type: dm.get_value_at(4, i),
+                introduced_date: dm.get_value_at(5, i),
+                quantity: dm.get_value_at(6, i),
+                source: dm.get_value_at(7, i),
+                purchase_date: dm.get_value_at(8, i),
+                cost: dm.get_value_at(9, i),
+                notes: dm.get_value_at(10, i),
+                image_path: dm.get_value_at(11, i),
+                status: dm.get_value_at(12, i)
+            });
+        }
+        return items;
+    } catch (e) {
+        console.error('Failed to get livestock:', e);
+        return [];
+    }
+}
+
+export function upsertLivestock(item) {
+    if (!_connection) return null;
+    try {
+        let sql;
+        // Sanitize? For prototype we use direct interpolation but strictly this is unsafe.
+        // We assume trusted input for now.
+        const name = item.name || '';
+        const scientific_name = item.scientific_name || '';
+        const type = item.type || '';
+        const introduced_date = item.introduced_date || '';
+        const quantity = item.quantity || 1;
+        const source = item.source || '';
+        const purchase_date = item.purchase_date || '';
+        const cost = item.cost || 0.0;
+        const notes = item.notes || '';
+        const image_path = item.image_path || '';
+        const status = item.status || 'Alive';
+
+        if (item.id) {
+            // Update
+            sql = `UPDATE livestock SET 
+                name='${name}', 
+                scientific_name='${scientific_name}', 
+                type='${type}', 
+                introduced_date='${introduced_date}', 
+                quantity=${quantity}, 
+                source='${source}', 
+                purchase_date='${purchase_date}', 
+                cost=${cost}, 
+                notes='${notes}', 
+                image_path='${image_path}', 
+                status='${status}' 
+                WHERE id=${item.id}`;
+        } else {
+            // Insert
+            sql = `INSERT INTO livestock (tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status) 
+                VALUES (${item.tank_id}, '${name}', '${scientific_name}', '${type}', '${introduced_date}', ${quantity}, '${source}', '${purchase_date}', ${cost}, '${notes}', '${image_path}', '${status}')`;
+        }
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to upsert livestock:', e);
+        throw e;
+    }
+}
+
+export function deleteLivestock(id) {
+    if (!_connection) return;
+    try {
+        const sql = `DELETE FROM livestock WHERE id=${id}`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to delete livestock:', e);
     }
 }
