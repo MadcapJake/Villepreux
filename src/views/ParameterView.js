@@ -60,6 +60,7 @@ export const ParameterView = GObject.registerClass(
                 spacing: 12,
                 css_classes: ['card', 'p-12'],
                 height_request: 200, // Placeholder height for chart
+                width_request: 340, // Minimum width for responsiveness
             });
 
             const label = new Gtk.Label({

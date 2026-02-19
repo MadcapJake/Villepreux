@@ -55,6 +55,7 @@ export const LivestockView = GObject.registerClass(
                 orientation: Gtk.Orientation.VERTICAL,
                 spacing: 6,
                 css_classes: ['card', 'p-12'],
+                width_request: 160,
             });
 
             const icon = new Gtk.Image({
