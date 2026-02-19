@@ -90,6 +90,15 @@ function _createTables() {
             note TEXT,
             FOREIGN KEY(livestock_id) REFERENCES livestock(id)
         )`,
+        `CREATE TABLE IF NOT EXISTS parameter_definitions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tank_id INTEGER,
+            name TEXT,
+            min_value REAL,
+            max_value REAL,
+            unit TEXT,
+            FOREIGN KEY(tank_id) REFERENCES tanks(id)
+        )`,
         `CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tank_id INTEGER,
@@ -115,15 +124,7 @@ export function createTank(tankData) {
         console.error('Database not initialized');
         return;
     }
-
-    // tankData: { name, volume, type, setupDate }
-    // Prepared statement usage in Gda is verbose. Using builder or simple string construction for MVP carefully.
-    // For MVP/Proto, we'll simple execute.
-    // WARNING: SQL Injection risk if not sanitized. Using quick string interpolation for prototype ONLY.
-    // TODO: Use Gda.Statement/Builder.
-
     const sql = `INSERT INTO tanks (name, volume, type, setup_date) VALUES ('${tankData.name}', ${tankData.volume}, '${tankData.type}', '${tankData.setupDate}')`;
-
     try {
         _connection.execute_non_select_command(sql);
         console.log('Tank created');
@@ -134,17 +135,11 @@ export function createTank(tankData) {
 
 export function getTanks() {
     if (!_connection) return [];
-
-    // Gda 6.0: execute_select_command returns a GdaDataModel
     try {
         const dm = _connection.execute_select_command('SELECT * FROM tanks ORDER BY id DESC');
         const numRows = dm.get_n_rows();
         const tanks = [];
-
         for (let i = 0; i < numRows; i++) {
-            // Retrieve values by column index. 
-            // 0: id, 1: name, 2: volume, 3: type, 4: setup_date, 5: image_path
-
             tanks.push({
                 id: dm.get_value_at(0, i),
                 name: dm.get_value_at(1, i),
@@ -158,5 +153,60 @@ export function getTanks() {
     } catch (e) {
         console.error('Failed to get tanks:', e);
         return [];
+    }
+}
+
+export function getParameterDefinitions(tankId) {
+    if (!_connection) return [];
+    try {
+        const sql = `SELECT * FROM parameter_definitions WHERE tank_id = ${tankId} ORDER BY name ASC`;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const defs = [];
+        for (let i = 0; i < numRows; i++) {
+            defs.push({
+                id: dm.get_value_at(0, i),
+                tank_id: dm.get_value_at(1, i),
+                name: dm.get_value_at(2, i),
+                min_value: dm.get_value_at(3, i),
+                max_value: dm.get_value_at(4, i),
+                unit: dm.get_value_at(5, i)
+            });
+        }
+        return defs;
+    } catch (e) {
+        console.error('Failed to get parameter definitions:', e);
+        return [];
+    }
+}
+
+export function upsertParameterDefinition(def) {
+    if (!_connection) return null;
+    try {
+        let sql;
+        if (def.id) {
+            // Update
+            sql = `UPDATE parameter_definitions SET name='${def.name}', min_value=${def.min_value}, max_value=${def.max_value}, unit='${def.unit}' WHERE id=${def.id}`;
+        } else {
+            // Insert
+            sql = `INSERT INTO parameter_definitions (tank_id, name, min_value, max_value, unit) VALUES (${def.tank_id}, '${def.name}', ${def.min_value}, ${def.max_value}, '${def.unit}')`;
+        }
+        _connection.execute_non_select_command(sql);
+
+        // Return latest id if insert? 
+        // Simplest to just return;
+    } catch (e) {
+        console.error('Failed to upsert parameter definition:', e);
+        throw e;
+    }
+}
+
+export function deleteParameterDefinition(id) {
+    if (!_connection) return;
+    try {
+        const sql = `DELETE FROM parameter_definitions WHERE id=${id}`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to delete parameter definition:', e);
     }
 }
