@@ -5,6 +5,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import { VillepreuxWindow } from './window.js';
+import { initDatabase } from './database.js';
 
 export const VillepreuxApp = GObject.registerClass(
     class VillepreuxApp extends Adw.Application {
@@ -28,6 +29,9 @@ export const VillepreuxApp = GObject.registerClass(
         vfunc_startup() {
             super.vfunc_startup();
             console.log('Villepreux starting up...');
+
+            // Initialize database
+            initDatabase();
         }
     }
 );

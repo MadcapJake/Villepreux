@@ -103,7 +103,7 @@ function _createTables() {
 
     queries.forEach(query => {
         try {
-            _connection.execute_non_select_command(query, null);
+            _connection.execute_non_select_command(query);
         } catch (e) {
             console.error('Error creating table:', e);
         }
@@ -125,9 +125,38 @@ export function createTank(tankData) {
     const sql = `INSERT INTO tanks (name, volume, type, setup_date) VALUES ('${tankData.name}', ${tankData.volume}, '${tankData.type}', '${tankData.setupDate}')`;
 
     try {
-        _connection.execute_non_select_command(sql, null);
+        _connection.execute_non_select_command(sql);
         console.log('Tank created');
     } catch (e) {
         console.error('Failed to create tank:', e);
+    }
+}
+
+export function getTanks() {
+    if (!_connection) return [];
+
+    // Gda 6.0: execute_select_command returns a GdaDataModel
+    try {
+        const dm = _connection.execute_select_command('SELECT * FROM tanks ORDER BY id DESC');
+        const numRows = dm.get_n_rows();
+        const tanks = [];
+
+        for (let i = 0; i < numRows; i++) {
+            // Retrieve values by column index. 
+            // 0: id, 1: name, 2: volume, 3: type, 4: setup_date, 5: image_path
+
+            tanks.push({
+                id: dm.get_value_at(0, i),
+                name: dm.get_value_at(1, i),
+                volume: dm.get_value_at(2, i),
+                type: dm.get_value_at(3, i),
+                setupDate: dm.get_value_at(4, i),
+                imagePath: dm.get_value_at(5, i)
+            });
+        }
+        return tanks;
+    } catch (e) {
+        console.error('Failed to get tanks:', e);
+        return [];
     }
 }
