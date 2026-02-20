@@ -77,7 +77,7 @@ export const LivestockView = GObject.registerClass(
 
         _createFishCard(item) {
             const button = new Gtk.Button({
-                css_classes: ['card', 'flat'],
+                css_classes: ['card'],
             });
 
             const card = new Gtk.Box({
@@ -130,7 +130,7 @@ export const LivestockView = GObject.registerClass(
 
         _createAddCard() {
             const button = new Gtk.Button({
-                css_classes: ['card', 'flat'],
+                css_classes: ['card'],
                 height_request: 200,
                 width_request: 180,
             });

@@ -7,7 +7,9 @@
     <file>views/AddTankDialog.js</file>
     <file>views/DashboardView.js</file>
     <file>views/ParameterView.js</file>
+    <file>views/LogParameterDialog.js</file>
     <file>views/LivestockView.js</file>
     <file>views/TaskView.js</file>
+    <file>views/GlobalDashboardView.js</file>
   </gresource>
 </gresources>

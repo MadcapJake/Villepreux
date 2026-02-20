@@ -77,9 +77,8 @@ export const ParameterView = GObject.registerClass(
         }
 
         _createChartCard(def) {
-            // Updated Card Layout: Body (Chart, Name, Last Result) + Footer (Range)
             const button = new Gtk.Button({
-                css_classes: ['card', 'flat'],
+                css_classes: ['card'],
             });
 
             const mainBox = new Gtk.Box({
@@ -149,7 +148,7 @@ export const ParameterView = GObject.registerClass(
 
         _createAddCard() {
             const button = new Gtk.Button({
-                css_classes: ['card', 'flat'],
+                css_classes: ['card'],
                 height_request: 200,
                 width_request: 260,
             });

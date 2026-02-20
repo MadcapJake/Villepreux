@@ -4,6 +4,8 @@ import Adw from 'gi://Adw';
 
 import { AddTankDialog } from './views/AddTankDialog.js';
 import { DashboardView } from './views/DashboardView.js';
+import { GlobalDashboardView } from './views/GlobalDashboardView.js';
+import { LogParameterDialog } from './views/LogParameterDialog.js';
 import { getTanks } from './database.js';
 
 export const VillepreuxWindow = GObject.registerClass(
@@ -37,10 +39,23 @@ export const VillepreuxWindow = GObject.registerClass(
                 show_start_title_buttons: false
             });
 
-            // Add Tank Button (Sidebar)
+            // Home Button (Sidebar Start)
+            const homeBtn = new Gtk.Button({
+                icon_name: 'go-home-symbolic',
+                tooltip_text: 'Global Dashboard',
+                css_classes: ['flat']
+            });
+            homeBtn.connect('clicked', () => {
+                this._showGlobalDashboard();
+                this._tanksList.unselect_all();
+            });
+            sidebarHeader.pack_start(homeBtn);
+
+            // Add Tank Button (Sidebar End)
             const addTankBtn = new Gtk.Button({
                 icon_name: 'list-add-symbolic',
-                tooltip_text: 'Add Tank'
+                tooltip_text: 'Add Tank',
+                css_classes: ['flat']
             });
             addTankBtn.connect('clicked', () => {
                 const dialog = new AddTankDialog(this);
@@ -56,9 +71,7 @@ export const VillepreuxWindow = GObject.registerClass(
             // Tank List
             this._tanksList = new Gtk.ListBox({
                 css_classes: ['navigation-sidebar'],
-            });
-            this._tanksList.connect('row-activated', (box, row) => {
-                this._onTankSelected(row.tank);
+                selection_mode: Gtk.SelectionMode.SINGLE,
             });
 
             // Wrap list in ScrolledWindow
@@ -152,7 +165,13 @@ export const VillepreuxWindow = GObject.registerClass(
                     const row = new Adw.ActionRow({
                         title: tank.name,
                         subtitle: `${tank.volume}L - ${tank.type}`,
+                        activatable: true,
                     });
+
+                    row.connect('activated', () => {
+                        this._onTankSelected(tank);
+                    });
+
                     // Store tank data on the row for retrieval on click
                     row.tank = tank;
                     this._tanksList.append(row);
@@ -176,10 +195,51 @@ export const VillepreuxWindow = GObject.registerClass(
             }
         }
 
+        _showGlobalDashboard() {
+            console.log('[Window] Showing Global Dashboard');
+            const dashboard = new GlobalDashboardView();
+            this._contentView.set_content(dashboard);
+
+            // Remove view switcher if present
+            if (this._viewSwitcherBar) {
+                this._contentView.remove(this._viewSwitcherBar);
+                this._viewSwitcherBar = null;
+            }
+
+            // Clear existing buttons
+            this._updateHeaderButtons(null);
+
+            // Add calendar button to header
+            if (dashboard.headerButton) {
+                this._contentHeader.pack_end(dashboard.headerButton);
+                // Don't track it in _activeHeaderButton so _updateHeaderButtons(null)
+                // from a subsequent tank click can safely clear whatever it finds
+                // actually we DO need to track it so we can clear it when switching BACK to a tank!
+                this._activeHeaderButton = dashboard.headerButton;
+            }
+
+            if (this._splitView.collapsed) {
+                this._splitView.show_sidebar = false;
+            }
+        }
+
         _onTankSelected(tank) {
             console.log(`[Window] Selected Tank: ${tank.name} (ID: ${tank.id})`);
+            this._currentTank = tank;
+
+            // Remember current tab if we are already showing a dashboard
+            let currentTab = null;
+            if (this._contentView.content && this._contentView.content.stack) {
+                currentTab = this._contentView.content.stack.get_visible_child_name();
+            }
+
             // Update content view with Dashboard for 'tank'
             const dashboard = new DashboardView(tank);
+
+            if (currentTab) {
+                dashboard.stack.set_visible_child_name(currentTab);
+            }
+
             this._contentView.set_content(dashboard);
 
             // Setup Bottom View Switcher
@@ -208,16 +268,19 @@ export const VillepreuxWindow = GObject.registerClass(
         }
 
         _updateHeaderButtons(stack) {
+            console.log(`[Window] _updateHeaderButtons called with stack: ${!!stack}`);
             // -- Clear existing end buttons --
             // Note: In GTK4/Adw there isn't a direct "clear_end" method conveniently exposed without iterating.
             // We'll rely on keeping a reference to the active button and removing it.
 
             if (this._activeHeaderButton) {
+                console.log(`[Window] Removing active header button:`, this._activeHeaderButton);
                 this._contentHeader.remove(this._activeHeaderButton);
                 this._activeHeaderButton = null;
             }
             // -- Clear existing back button (start) --
             if (this._backButton) {
+                console.log(`[Window] Removing back button`);
                 this._contentHeader.remove(this._backButton);
                 this._backButton = null;
             }
@@ -235,7 +298,15 @@ export const VillepreuxWindow = GObject.registerClass(
                     label: 'Add Test Result',
                     css_classes: ['suggested-action'],
                 });
-                // btn.connect('clicked', ...)
+                btn.connect('clicked', () => {
+                    const dialog = new LogParameterDialog(this, this._currentTank);
+                    dialog.connect('parameters-logged', () => {
+                        if (visibleChild && typeof visibleChild._refreshGrid === 'function') {
+                            visibleChild._refreshGrid();
+                        }
+                    });
+                    dialog.present();
+                });
             } else if (visibleName === 'livestock') {
                 btn = new Gtk.Button({
                     label: 'Add Inhabitant',

@@ -166,6 +166,7 @@ export function getParameterDefinitions(tankId) {
     if (!_connection) return [];
     try {
         const sql = `SELECT * FROM parameter_definitions WHERE tank_id = ${tankId} ORDER BY name ASC`;
+        console.log(`[DB] getParameterDefinitions SQL: ${sql}`);
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
         const defs = [];
@@ -221,6 +222,7 @@ export function getLivestock(tankId) {
     if (!_connection) return [];
     try {
         const sql = `SELECT * FROM livestock WHERE tank_id = ${tankId} ORDER BY name ASC`;
+        console.log(`[DB] getLivestock SQL: ${sql}`);
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
         const items = [];
@@ -300,5 +302,77 @@ export function deleteLivestock(id) {
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to delete livestock:', e);
+    }
+}
+
+export function insertParameter(tankId, type, value, dateLogged, notes = '') {
+    if (!_connection) return;
+    try {
+        const sql = `INSERT INTO parameters (tank_id, type, value, date_logged, notes) VALUES (${tankId}, '${type}', ${value}, '${dateLogged}', '${notes}')`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to insert parameter:', e);
+        throw e;
+    }
+}
+
+export function getParametersByDate(dateStr) {
+    if (!_connection) return [];
+    try {
+        const sql = `
+            SELECT p.id, t.name as tank_name, p.type, p.value, pd.unit
+            FROM parameters p
+            JOIN tanks t ON p.tank_id = t.id
+            LEFT JOIN parameter_definitions pd ON p.tank_id = pd.tank_id AND p.type = pd.name
+            WHERE p.date_logged LIKE '${dateStr}%'
+            ORDER BY t.name ASC, p.type ASC
+        `;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const results = [];
+        for (let i = 0; i < numRows; i++) {
+            results.push({
+                id: dm.get_value_at(0, i),
+                tank_name: dm.get_value_at(1, i),
+                type: dm.get_value_at(2, i),
+                value: dm.get_value_at(3, i),
+                unit: dm.get_value_at(4, i)
+            });
+        }
+        return results;
+    } catch (e) {
+        console.error('Failed to get parameters by date:', e);
+        return [];
+    }
+}
+
+export function getTasksByDate(dateStr) {
+    if (!_connection) return { due: [], completed: [] };
+    try {
+        const sql = `
+            SELECT t.id, tk.name as tank_name, t.title, t.next_due, t.last_completed
+            FROM tasks t
+            JOIN tanks tk ON t.tank_id = tk.id
+            WHERE t.next_due LIKE '${dateStr}%' OR t.last_completed LIKE '${dateStr}%'
+        `;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const due = [];
+        const completed = [];
+        for (let i = 0; i < numRows; i++) {
+            const nextDueStr = dm.get_value_at(3, i) || '';
+            const lastCompletedStr = dm.get_value_at(4, i) || '';
+            const task = {
+                id: dm.get_value_at(0, i),
+                tank_name: dm.get_value_at(1, i),
+                title: dm.get_value_at(2, i)
+            };
+            if (nextDueStr.startsWith(dateStr)) due.push(task);
+            if (lastCompletedStr.startsWith(dateStr)) completed.push(task);
+        }
+        return { due, completed };
+    } catch (e) {
+        console.error('Failed to get tasks by date:', e);
+        return { due: [], completed: [] };
     }
 }
