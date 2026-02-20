@@ -4,6 +4,7 @@ import Adw from 'gi://Adw';
 
 import * as DB from '../database.js';
 import { LogSingleParameterDialog } from './LogSingleParameterDialog.js';
+import { ChartWidget } from '../widgets/ChartWidget.js';
 
 export const ParameterView = GObject.registerClass(
     class ParameterView extends Adw.Bin {
@@ -95,12 +96,12 @@ export const ParameterView = GObject.registerClass(
                 vexpand: true,
             });
 
-            // Placeholder mini-chart (using a LevelBar for now)
-            const chart = new Gtk.LevelBar({
-                value: 0.7,
-                height_request: 60,
-                margin_bottom: 12,
-            });
+            const history = DB.getParameterHistory(this.tank.id, def.name);
+
+            // Mini-chart
+            const chart = new ChartWidget(def, history);
+            chart.height_request = 60;
+            chart.margin_bottom = 12;
 
             const nameLabel = new Gtk.Label({
                 label: def.name || 'Unknown',
@@ -231,11 +232,8 @@ export const ParameterView = GObject.registerClass(
                 css_classes: ['view'],
                 height_request: 300,
             });
-            const chartLabel = new Gtk.Label({
-                label: `Large Chart for ${def.name || 'New Parameter'}`,
-                css_classes: ['title-2', 'dim-label'],
-            });
-            chartFrame.set_child(chartLabel);
+            const largeChart = new ChartWidget(def, []);
+            chartFrame.set_child(largeChart);
             mainBox.append(chartFrame);
 
             // 2. Configuration Group
@@ -358,6 +356,10 @@ export const ParameterView = GObject.registerClass(
                     historyGroup.header_suffix = headerSuffix;
 
                     const results = DB.getParameterHistory(this.tank.id, def.name);
+
+                    if (largeChart && typeof largeChart.updateData === 'function') {
+                        largeChart.updateData(results);
+                    }
 
                     if (results.length === 0) {
                         const emptyRow = new Adw.ActionRow({
