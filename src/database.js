@@ -346,6 +346,66 @@ export function getParametersByDate(dateStr) {
     }
 }
 
+export function getLatestParameterResult(tankId, paramName) {
+    if (!_connection) return null;
+    try {
+        const sql = `
+            SELECT value, date_logged
+            FROM parameters
+            WHERE tank_id = ${tankId} AND type = '${paramName}'
+            ORDER BY date_logged DESC, id DESC
+            LIMIT 1
+        `;
+        const dm = _connection.execute_select_command(sql);
+        if (dm.get_n_rows() > 0) {
+            return {
+                value: dm.get_value_at(0, 0),
+                date: dm.get_value_at(1, 0)
+            };
+        }
+        return null;
+    } catch (e) {
+        console.error('Failed to get latest parameter result:', e);
+        return null;
+    }
+}
+
+export function getParameterHistory(tankId, type) {
+    if (!_connection) return [];
+    try {
+        const sql = `
+            SELECT id, value, date_logged
+            FROM parameters
+            WHERE tank_id = ${tankId} AND type = '${type}'
+            ORDER BY date_logged DESC, id DESC
+        `;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const results = [];
+        for (let i = 0; i < numRows; i++) {
+            results.push({
+                id: dm.get_value_at(0, i),
+                value: dm.get_value_at(1, i),
+                date: dm.get_value_at(2, i)
+            });
+        }
+        return results;
+    } catch (e) {
+        console.error('Failed to get parameter history:', e);
+        return [];
+    }
+}
+
+export function deleteParameterRecord(id) {
+    if (!_connection) return;
+    try {
+        const sql = `DELETE FROM parameters WHERE id=${id}`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to delete parameter record:', e);
+    }
+}
+
 export function getTasksByDate(dateStr) {
     if (!_connection) return { due: [], completed: [] };
     try {

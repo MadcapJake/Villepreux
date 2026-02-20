@@ -3,6 +3,7 @@ import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
 
 import * as DB from '../database.js';
+import { LogSingleParameterDialog } from './LogSingleParameterDialog.js';
 
 export const ParameterView = GObject.registerClass(
     class ParameterView extends Adw.Bin {
@@ -107,8 +108,16 @@ export const ParameterView = GObject.registerClass(
                 halign: Gtk.Align.START,
             });
 
+            // Fetch latest result
+            const latest = DB.getLatestParameterResult(this.tank.id, def.name);
+            let resultText = 'Last Result: --';
+            if (latest) {
+                // Formatting date optionally to be shorter, but exact string is fine for now
+                resultText = `Last Result: ${latest.value} ${def.unit} (${latest.date})`;
+            }
+
             const resultLabel = new Gtk.Label({
-                label: 'Last Result: --', // Placeholder for now
+                label: resultText,
                 css_classes: ['body'],
                 halign: Gtk.Align.START,
             });
@@ -316,46 +325,76 @@ export const ParameterView = GObject.registerClass(
 
             // 3. History List (Only if not new)
             if (!isNew) {
-                const historyGroup = new Adw.PreferencesGroup({
-                    title: 'Recent Results',
+                const historyContainer = new Gtk.Box({
+                    orientation: Gtk.Orientation.VERTICAL
                 });
 
-                // Example History Items (Still dummy for now)
-                const results = [
-                    { date: 'Today', value: '8.2' },
-                    { date: 'Yesterday', value: '8.1' },
-                ];
+                const refreshHistory = () => {
+                    let child = historyContainer.get_first_child();
+                    while (child) {
+                        historyContainer.remove(child);
+                        child = historyContainer.get_first_child();
+                    }
 
-                results.forEach(res => {
-                    const row = new Adw.ActionRow({
-                        title: `${res.value}`,
-                        subtitle: res.date,
+                    const historyGroup = new Adw.PreferencesGroup({
+                        title: 'Recent Results',
                     });
 
-                    // Edit Button
-                    const editBtn = new Gtk.Button({
-                        icon_name: 'document-edit-symbolic',
+                    const headerSuffix = new Gtk.Button({
+                        icon_name: 'list-add-symbolic',
+                        valign: Gtk.Align.CENTER,
                         css_classes: ['flat'],
-                        valign: Gtk.Align.CENTER,
-                        tooltip_text: 'Edit Result',
+                        tooltip_text: 'Log Result',
                     });
-                    // editBtn.connect('clicked', ...)
-                    row.add_suffix(editBtn);
-
-                    // Delete Button
-                    const delBtn = new Gtk.Button({
-                        icon_name: 'user-trash-symbolic',
-                        css_classes: ['flat', 'destructive-action'],
-                        valign: Gtk.Align.CENTER,
-                        tooltip_text: 'Delete Result',
+                    headerSuffix.connect('clicked', () => {
+                        const rootWindow = this.get_root();
+                        const dialog = new LogSingleParameterDialog(rootWindow, this.tank, def);
+                        dialog.connect('parameter-logged', () => {
+                            refreshHistory();
+                            this._refreshGrid(); // Update the card on the root page
+                        });
+                        dialog.present();
                     });
-                    // delBtn.connect('clicked', ...)
-                    row.add_suffix(delBtn);
+                    historyGroup.header_suffix = headerSuffix;
 
-                    historyGroup.add(row);
-                });
+                    const results = DB.getParameterHistory(this.tank.id, def.name);
 
-                mainBox.append(historyGroup);
+                    if (results.length === 0) {
+                        const emptyRow = new Adw.ActionRow({
+                            title: 'No results logged',
+                            subtitle: 'Click + to log the first result.',
+                        });
+                        historyGroup.add(emptyRow);
+                    }
+
+                    results.forEach(res => {
+                        const unitStr = def.unit ? ` ${def.unit}` : '';
+                        const row = new Adw.ActionRow({
+                            title: `${res.value}${unitStr}`,
+                            subtitle: res.date,
+                        });
+
+                        const delBtn = new Gtk.Button({
+                            icon_name: 'user-trash-symbolic',
+                            css_classes: ['flat', 'destructive-action'],
+                            valign: Gtk.Align.CENTER,
+                            tooltip_text: 'Delete Result',
+                        });
+                        delBtn.connect('clicked', () => {
+                            DB.deleteParameterRecord(res.id);
+                            refreshHistory();
+                            this._refreshGrid();
+                        });
+                        row.add_suffix(delBtn);
+
+                        historyGroup.add(row);
+                    });
+
+                    historyContainer.append(historyGroup);
+                };
+
+                refreshHistory();
+                mainBox.append(historyContainer);
 
                 // Delete Parameter Button
                 const dangerGroup = new Adw.PreferencesGroup();

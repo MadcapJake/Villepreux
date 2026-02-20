@@ -2,25 +2,27 @@ import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
 import GLib from 'gi://GLib';
+
 import * as DB from '../database.js';
 
-export const LogParameterDialog = GObject.registerClass(
+export const LogSingleParameterDialog = GObject.registerClass(
     {
         Signals: {
-            'parameters-logged': {},
-        },
+            'parameter-logged': {},
+        }
     },
-    class LogParameterDialog extends Adw.Window {
-        _init(parentWindow, tank) {
+    class LogSingleParameterDialog extends Adw.Window {
+        _init(parentWindow, tank, def) {
             super._init({
                 transient_for: parentWindow,
                 modal: true,
-                title: 'Log Test Results',
+                title: `Log ${def.name}`,
                 default_width: 400,
-                default_height: 500,
+                default_height: 300,
             });
 
             this.tank = tank;
+            this.def = def;
             this._setupUI();
         }
 
@@ -64,13 +66,12 @@ export const LogParameterDialog = GObject.registerClass(
             // Date Group
             const dateGroup = new Adw.PreferencesGroup({ title: 'Date' });
 
-            const now = GLib.DateTime.new_now_local();
-            const todayStr = now.format('%Y-%m-%d');
-            this._currentDateStr = todayStr;
+            const today = GLib.DateTime.new_now_local();
+            this._currentDateStr = today.format('%Y-%m-%d');
 
             this._dateRow = new Adw.ActionRow({
                 title: 'Date Logged',
-                subtitle: todayStr,
+                subtitle: this._currentDateStr,
             });
 
             const calendar = new Gtk.Calendar({
@@ -98,79 +99,56 @@ export const LogParameterDialog = GObject.registerClass(
             });
 
             this._dateRow.add_suffix(dateBtn);
-
-            // Make row clicking also toggle popover
             this._dateRow.activatable_widget = dateBtn;
 
             dateGroup.add(this._dateRow);
             mainBox.append(dateGroup);
 
-            // Parameters Group
-            const paramGroup = new Adw.PreferencesGroup({
-                title: 'Results',
+            // Value Group
+            const valueGroup = new Adw.PreferencesGroup({ title: 'Result' });
+            this._valueRow = new Adw.EntryRow({
+                title: this.def.name,
+                input_purpose: Gtk.InputPurpose.NUMBER,
             });
 
-            this._paramEntries = [];
-            const defs = DB.getParameterDefinitions(this.tank.id);
-
             const validateInputs = () => {
-                // At least one field required
-                let anyFilled = false;
-                this._paramEntries.forEach(item => {
-                    if (item.row.text && item.row.text.trim() !== '') {
-                        anyFilled = true;
-                    }
-                });
-                this._saveBtn.sensitive = anyFilled;
+                this._saveBtn.sensitive = !!(this._valueRow.text && this._valueRow.text.trim() !== '');
             };
 
-            if (defs.length === 0) {
-                const emptyRow = new Adw.ActionRow({
-                    title: 'No Parameters Configured',
-                    subtitle: 'Add parameters in the dashboard first.'
-                });
-                paramGroup.add(emptyRow);
-                this._saveBtn.sensitive = false; // Cannot save if no parameters
-            } else {
-                defs.forEach(def => {
-                    const row = new Adw.EntryRow({
-                        title: `${def.name} (${def.unit})`,
-                        input_purpose: Gtk.InputPurpose.NUMBER,
-                    });
+            this._valueRow.connect('notify::text', () => validateInputs());
+            validateInputs();
 
-                    row.connect('notify::text', () => validateInputs());
-
-                    paramGroup.add(row);
-                    this._paramEntries.push({ def, row });
+            if (this.def.unit) {
+                const unitLabel = new Gtk.Label({
+                    label: this.def.unit,
+                    css_classes: ['dim-label'],
+                    valign: Gtk.Align.CENTER,
+                    margin_end: 12,
                 });
-                // Initial validation
-                validateInputs();
+                this._valueRow.add_suffix(unitLabel);
             }
 
-            mainBox.append(paramGroup);
+            valueGroup.add(this._valueRow);
+            mainBox.append(valueGroup);
+
             clamp.set_child(mainBox);
             scroll.set_child(clamp);
             toolbarView.set_content(scroll);
-
             this.set_content(toolbarView);
         }
 
         _onSave() {
             const dateStr = this._currentDateStr;
-
-            this._paramEntries.forEach(item => {
-                const valStr = item.row.text;
-                // Replace commas with dots if user typed them
-                const normalizedStr = valStr.replace(',', '.');
-                if (normalizedStr) {
-                    const value = parseFloat(normalizedStr);
-                    if (!isNaN(value)) {
-                        DB.insertParameter(this.tank.id, item.def.name, value, dateStr);
-                    }
+            const valStr = this._valueRow.text;
+            const normalizedStr = valStr.replace(',', '.');
+            if (normalizedStr) {
+                const value = parseFloat(normalizedStr);
+                if (!isNaN(value)) {
+                    DB.insertParameter(this.tank.id, this.def.name, value, dateStr);
                 }
-            });
+            }
 
-            this.emit('parameters-logged');
+            this.emit('parameter-logged');
             this.close();
         }
     }

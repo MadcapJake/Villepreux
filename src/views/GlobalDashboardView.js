@@ -109,12 +109,7 @@ export const GlobalDashboardView = GObject.registerClass(
         _onDaySelected() {
             const date = this._calendar.get_date();
             // In GTK4, get_date returns a GLib.DateTime
-            const year = date.get_year();
-            const month = date.get_month(); // 1-12
-            const day = date.get_day_of_month();
-
-            // Format as YYYY-MM-DD for simpler DB querying later
-            const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const formattedDate = date.format('%Y-%m-%d');
 
             console.log(`[GlobalDashboard] Selected Date: ${formattedDate}`);
 
