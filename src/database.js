@@ -436,3 +436,34 @@ export function getTasksByDate(dateStr) {
         return { due: [], completed: [] };
     }
 }
+
+export function getLivestockEventsByDate(dateStr) {
+    if (!_connection) return { purchased: [], introduced: [] };
+    try {
+        const sql = `
+            SELECT l.id, t.name as tank_name, l.name, l.purchase_date, l.introduced_date
+            FROM livestock l
+            JOIN tanks t ON l.tank_id = t.id
+            WHERE l.purchase_date LIKE '${dateStr}%' OR l.introduced_date LIKE '${dateStr}%'
+        `;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const purchased = [];
+        const introduced = [];
+        for (let i = 0; i < numRows; i++) {
+            const purchaseStr = dm.get_value_at(3, i) || '';
+            const intStr = dm.get_value_at(4, i) || '';
+            const item = {
+                id: dm.get_value_at(0, i),
+                tank_name: dm.get_value_at(1, i),
+                name: dm.get_value_at(2, i)
+            };
+            if (purchaseStr.startsWith(dateStr)) purchased.push(item);
+            if (intStr.startsWith(dateStr)) introduced.push(item);
+        }
+        return { purchased, introduced };
+    } catch (e) {
+        console.error('Failed to get livestock events by date:', e);
+        return { purchased: [], introduced: [] };
+    }
+}

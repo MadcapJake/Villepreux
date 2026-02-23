@@ -148,6 +148,7 @@ export const GlobalDashboardView = GObject.registerClass(
 
             const parameters = DB.getParametersByDate(dateStr);
             const tasks = DB.getTasksByDate(dateStr);
+            const livestockEvents = DB.getLivestockEventsByDate(dateStr);
 
             let hasData = false;
 
@@ -192,6 +193,34 @@ export const GlobalDashboardView = GObject.registerClass(
                     completedGroup.add(row);
                 });
                 this._detailsBox.append(completedGroup);
+            }
+
+            if (livestockEvents.purchased.length > 0) {
+                hasData = true;
+                const purGroup = new Adw.PreferencesGroup({ title: 'Livestock Purchased' });
+                livestockEvents.purchased.forEach(l => {
+                    const row = new Adw.ActionRow({
+                        title: l.name || 'Unnamed',
+                        subtitle: `Tank: ${l.tank_name}`,
+                        icon_name: 'list-add-symbolic',
+                    });
+                    purGroup.add(row);
+                });
+                this._detailsBox.append(purGroup);
+            }
+
+            if (livestockEvents.introduced.length > 0) {
+                hasData = true;
+                const intGroup = new Adw.PreferencesGroup({ title: 'Livestock Introduced' });
+                livestockEvents.introduced.forEach(l => {
+                    const row = new Adw.ActionRow({
+                        title: l.name || 'Unnamed',
+                        subtitle: `Tank: ${l.tank_name}`,
+                        icon_name: 'go-down-symbolic',
+                    });
+                    intGroup.add(row);
+                });
+                this._detailsBox.append(intGroup);
             }
 
             if (!hasData) {

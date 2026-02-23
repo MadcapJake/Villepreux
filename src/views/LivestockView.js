@@ -268,13 +268,47 @@ export const LivestockView = GObject.registerClass(
                 infoGroup.add(row);
             };
 
+            const addDateEntry = (title, key) => {
+                const row = new Adw.ActionRow({
+                    title: title,
+                    subtitle: edits[key] || 'Not set',
+                });
+
+                const calendar = new Gtk.Calendar({
+                    show_week_numbers: false,
+                    show_day_names: true,
+                    show_heading: true,
+                });
+
+                const calendarPopover = new Gtk.Popover({ child: calendar });
+                const dateBtn = new Gtk.MenuButton({
+                    icon_name: 'x-office-calendar-symbolic',
+                    valign: Gtk.Align.CENTER,
+                    popover: calendarPopover,
+                    css_classes: ['flat'],
+                });
+
+                calendar.connect('day-selected', () => {
+                    const date = calendar.get_date();
+                    const dateStr = date.format('%Y-%m-%d');
+                    edits[key] = dateStr;
+                    row.subtitle = dateStr;
+                    calendarPopover.popdown();
+                    onEdit();
+                });
+
+                row.add_suffix(dateBtn);
+                row.activatable_widget = dateBtn;
+                infoGroup.add(row);
+            };
+
             addEntry('Name', 'name');
             addEntry('Scientific Name', 'scientific_name');
-            addEntry('Type', 'type'); // Could be ComboRow
-            addEntry('Introduced On', 'introduced_date'); // Date picker ideal, text for now
+            addEntry('Type', 'type');
+            addDateEntry('Introduced On', 'introduced_date');
             addEntry('Quantity', 'quantity', Gtk.InputPurpose.NUMBER);
             addEntry('Purchased From', 'source');
-            addEntry('Purchased On', 'purchase_date');
+            addDateEntry('Purchased On', 'purchase_date');
             addEntry('Cost', 'cost', Gtk.InputPurpose.NUMBER);
             addEntry('Notes', 'notes');
 
