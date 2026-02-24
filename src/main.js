@@ -3,6 +3,7 @@ import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Gdk from 'gi://Gdk';
 
 import { VillepreuxWindow } from './window.js';
 import { initDatabase } from './database.js';
@@ -29,6 +30,10 @@ export const VillepreuxApp = GObject.registerClass(
         vfunc_startup() {
             super.vfunc_startup();
             console.log('Villepreux starting up...');
+
+            // Add icon theme search path for custom SVGs in gresource
+            const iconTheme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default());
+            iconTheme.add_resource_path('/com/github/madcapjake/Villepreux/icons');
 
             // Initialize database
             initDatabase();

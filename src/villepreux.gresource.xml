@@ -13,5 +13,7 @@
     <file>views/GlobalDashboardView.js</file>
     <file>widgets/ChartWidget.js</file>
     <file>views/LogSingleParameterDialog.js</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/fish-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/thermometer-symbolic.svg</file>
   </gresource>
 </gresources>

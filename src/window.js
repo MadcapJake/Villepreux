@@ -190,6 +190,7 @@ export const VillepreuxWindow = GObject.registerClass(
                         this._viewSwitcherBar = null;
                         this._updateHeaderButtons(null);
                     }
+                    this.set_title('Villepreux');
                     this._contentView.set_content(this._statusPage);
                 }
             }
@@ -198,6 +199,8 @@ export const VillepreuxWindow = GObject.registerClass(
         _showGlobalDashboard() {
             console.log('[Window] Showing Global Dashboard');
             const dashboard = new GlobalDashboardView();
+
+            this.set_title('Villepreux');
             this._contentView.set_content(dashboard);
 
             // Remove view switcher if present
@@ -226,6 +229,8 @@ export const VillepreuxWindow = GObject.registerClass(
         _onTankSelected(tank) {
             console.log(`[Window] Selected Tank: ${tank.name} (ID: ${tank.id})`);
             this._currentTank = tank;
+
+            this.set_title(tank.name);
 
             // Remember current tab if we are already showing a dashboard
             let currentTab = null;
