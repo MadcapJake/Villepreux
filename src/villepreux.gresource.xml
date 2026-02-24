@@ -16,7 +16,12 @@
     <file>widgets/ChartWidget.js</file>
     <file>views/AnalyzeParametersDialog.js</file>
     <file>views/LogSingleParameterDialog.js</file>
+    <file>views/PastActivitiesDialog.js</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/fish-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/thermometer-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/running-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/drawer-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/archive-extract-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/edit-delete-symbolic.svg</file>
   </gresource>
 </gresources>

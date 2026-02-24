@@ -568,6 +568,34 @@ export function getTaskTemplates(tankId) {
     }
 }
 
+export function getArchivedTaskTemplates(tankId) {
+    if (!_connection) return [];
+    try {
+        const sql = `SELECT * FROM task_templates WHERE tank_id = ${tankId} AND status = 'Archived' ORDER BY category ASC, next_due_date ASC`;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const results = [];
+        for (let i = 0; i < numRows; i++) {
+            results.push({
+                id: dm.get_value_at(0, i),
+                tank_id: dm.get_value_at(1, i),
+                equipment_id: dm.get_value_at(2, i),
+                category: dm.get_value_at(3, i),
+                title: dm.get_value_at(4, i),
+                instructions: dm.get_value_at(5, i),
+                schedule_type: dm.get_value_at(6, i),
+                interval_value: dm.get_value_at(7, i),
+                next_due_date: dm.get_value_at(8, i),
+                status: dm.get_value_at(9, i)
+            });
+        }
+        return results;
+    } catch (e) {
+        console.error('Failed to get archived task templates:', e);
+        return [];
+    }
+}
+
 export function upsertTaskTemplate(task) {
     if (!_connection) return;
     try {
@@ -592,14 +620,36 @@ export function upsertTaskTemplate(task) {
     }
 }
 
-export function deleteTaskTemplate(id) {
+export function archiveTaskTemplate(id) {
     if (!_connection) return;
     try {
-        // Soft delete
         const sql = `UPDATE task_templates SET status='Archived' WHERE id=${id}`;
         _connection.execute_non_select_command(sql);
     } catch (e) {
-        console.error('Failed to delete/archive task template:', e);
+        console.error('Failed to archive task template:', e);
+    }
+}
+
+export function restoreTaskTemplate(id) {
+    if (!_connection) return;
+    try {
+        const sql = `UPDATE task_templates SET status='Active' WHERE id=${id}`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to restore task template:', e);
+    }
+}
+
+export function permanentlyDeleteTaskTemplate(id) {
+    if (!_connection) return;
+    try {
+        const sqlActs = `DELETE FROM task_activities WHERE task_template_id=${id}`;
+        _connection.execute_non_select_command(sqlActs);
+
+        const sql = `DELETE FROM task_templates WHERE id=${id}`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to hard delete task template:', e);
     }
 }
 
@@ -620,5 +670,38 @@ export function logTaskActivity(templateId, actionTaken, notes, executionDateStr
         }
     } catch (e) {
         console.error('Failed to log task activity:', e);
+    }
+}
+
+export function getTaskActivities(templateId) {
+    if (!_connection) return [];
+    try {
+        const sql = `SELECT * FROM task_activities WHERE task_template_id=${templateId} ORDER BY execution_date DESC`;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const results = [];
+        for (let i = 0; i < numRows; i++) {
+            results.push({
+                id: dm.get_value_at(0, i),
+                task_template_id: dm.get_value_at(1, i),
+                execution_date: dm.get_value_at(2, i),
+                action_taken: dm.get_value_at(3, i),
+                notes: dm.get_value_at(4, i)
+            });
+        }
+        return results;
+    } catch (e) {
+        console.error('Failed to get task activities:', e);
+        return [];
+    }
+}
+
+export function deleteTaskActivity(activityId) {
+    if (!_connection) return;
+    try {
+        const sql = `DELETE FROM task_activities WHERE id=${activityId}`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to delete task activity:', e);
     }
 }

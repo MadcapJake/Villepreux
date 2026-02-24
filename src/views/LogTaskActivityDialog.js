@@ -1,6 +1,7 @@
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
+import GLib from 'gi://GLib';
 import * as DB from '../database.js';
 
 export const LogTaskActivityDialog = GObject.registerClass(
@@ -24,6 +25,27 @@ export const LogTaskActivityDialog = GObject.registerClass(
         }
 
         _setupUI() {
+            const toolbarView = new Adw.ToolbarView();
+
+            const headerBar = new Adw.HeaderBar({
+                title_widget: new Gtk.Label({ label: `${this.actionStr} Task`, css_classes: ['title'] }),
+                show_end_title_buttons: false,
+                show_start_title_buttons: false
+            });
+
+            const cancelBtn = new Gtk.Button({ label: 'Cancel' });
+            cancelBtn.connect('clicked', () => this.close());
+            headerBar.pack_start(cancelBtn);
+
+            const saveBtn = new Gtk.Button({
+                label: 'Save',
+                css_classes: ['suggested-action'],
+            });
+            saveBtn.connect('clicked', () => this._onSave());
+            headerBar.pack_end(saveBtn);
+
+            toolbarView.add_top_bar(headerBar);
+
             const clamp = new Adw.Clamp({
                 maximum_size: 450,
                 margin_start: 12,
@@ -49,16 +71,44 @@ export const LogTaskActivityDialog = GObject.registerClass(
             });
             headerGroup.add(nameRow);
 
-            // Date & Time Picker (Simple EntryRow for now due to GTK4 constraints, or Calendar)
-            // Flatpak GTK4 often relies on custom widgets for full DateTime.
-            // We'll use an EntryRow that defaults to today's date YYYY-MM-DD for now.
-            const today = new Date().toISOString().split('T')[0];
+            // Date & Time Picker using Gtk.Calendar
+            const now = GLib.DateTime.new_now_local();
+            const todayStr = now.format('%Y-%m-%d');
+            this._currentDateStr = todayStr;
 
-            this.dateEntry = new Adw.EntryRow({
+            this.dateRow = new Adw.ActionRow({
                 title: 'Date Logged',
-                text: today,
+                subtitle: todayStr,
             });
-            headerGroup.add(this.dateEntry);
+
+            const calendar = new Gtk.Calendar({
+                show_week_numbers: false,
+                show_day_names: true,
+                show_heading: true,
+            });
+
+            const calendarPopover = new Gtk.Popover({
+                child: calendar,
+            });
+
+            const dateBtn = new Gtk.MenuButton({
+                icon_name: 'x-office-calendar-symbolic',
+                valign: Gtk.Align.CENTER,
+                popover: calendarPopover,
+                css_classes: ['flat'],
+            });
+
+            calendar.connect('day-selected', () => {
+                const date = calendar.get_date();
+                this._currentDateStr = date.format('%Y-%m-%d');
+                this.dateRow.subtitle = this._currentDateStr;
+                calendarPopover.popdown();
+            });
+
+            this.dateRow.add_suffix(dateBtn);
+            this.dateRow.activatable_widget = dateBtn;
+
+            headerGroup.add(this.dateRow);
 
             // Notes
             this.notesEntry = new Adw.EntryRow({
@@ -66,35 +116,8 @@ export const LogTaskActivityDialog = GObject.registerClass(
             });
             this.notesEntry.set_text('');
 
-            // GTK TextView allows multi-line if needed, but EntryRow is cleaner for small notes.
-            // Let's use standard EntryRow since we are in Adw.
-
             headerGroup.add(this.notesEntry);
             mainBox.append(headerGroup);
-
-
-            // Dialog Actions (Footer or Header buttons)
-            // We will use standard Gtk Buttons in a Box at the bottom.
-            const actionBox = new Gtk.Box({
-                orientation: Gtk.Orientation.HORIZONTAL,
-                spacing: 12,
-                halign: Gtk.Align.END,
-                margin_top: 24,
-            });
-
-            const cancelBtn = new Gtk.Button({ label: 'Cancel' });
-            cancelBtn.connect('clicked', () => this.close());
-
-            const saveBtn = new Gtk.Button({
-                label: 'Save',
-                css_classes: ['suggested-action'],
-            });
-            saveBtn.connect('clicked', () => this._onSave());
-
-            actionBox.append(cancelBtn);
-            actionBox.append(saveBtn);
-
-            mainBox.append(actionBox);
 
             clamp.set_child(mainBox);
 
@@ -104,7 +127,9 @@ export const LogTaskActivityDialog = GObject.registerClass(
             });
             scroll.set_child(clamp);
 
-            this.set_child(scroll);
+            toolbarView.set_content(scroll);
+
+            this.set_child(toolbarView);
         }
 
         _calculateNextDueDate(executionDateStr) {
@@ -134,7 +159,7 @@ export const LogTaskActivityDialog = GObject.registerClass(
         }
 
         _onSave() {
-            const execDateStr = this.dateEntry.get_text() || new Date().toISOString().split('T')[0];
+            const execDateStr = this._currentDateStr || new Date().toISOString().split('T')[0];
             const notes = this.notesEntry.get_text() || '';
 
             // Calculate next due date

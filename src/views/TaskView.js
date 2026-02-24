@@ -4,6 +4,7 @@ import Adw from 'gi://Adw';
 import * as DB from '../database.js';
 import { LogTaskActivityDialog } from './LogTaskActivityDialog.js';
 import { CreateTaskTemplateDialog } from './CreateTaskTemplateDialog.js';
+import { PastActivitiesDialog } from './PastActivitiesDialog.js';
 
 export const TaskView = GObject.registerClass(
     class TaskView extends Adw.PreferencesPage {
@@ -30,6 +31,19 @@ export const TaskView = GObject.registerClass(
             });
             this.emptyStateGroup.add(this.emptyState);
             this.add(this.emptyStateGroup);
+            this.emptyStateAdded = true;
+
+            // Archived section
+            this.archiveGroup = new Adw.PreferencesGroup({
+                margin_top: 24,
+            });
+            this.archiveExpander = new Adw.ExpanderRow({
+                title: 'Archived Tasks',
+                icon_name: 'user-trash-full-symbolic',
+            });
+            this.archiveGroup.add(this.archiveExpander);
+            this.add(this.archiveGroup);
+            this.archiveAdded = true;
         }
 
         openCreateTaskDialog() {
@@ -48,16 +62,38 @@ export const TaskView = GObject.registerClass(
             }
             this.groups = {};
 
-            const templates = DB.getTaskTemplates(this.tank.id);
+            // Temporarily remove empty state and archive group to manage order
+            if (this.emptyStateAdded) {
+                this.remove(this.emptyStateGroup);
+                this.emptyStateAdded = false;
+            }
+            if (this.archiveAdded) {
+                this.remove(this.archiveGroup);
+                this.archiveAdded = false;
+            }
 
-            if (templates.length === 0) {
+            const templates = DB.getTaskTemplates(this.tank.id);
+            const archivedTemplates = DB.getArchivedTaskTemplates(this.tank.id);
+
+            // Hide/Show empty state
+            if (templates.length === 0 && archivedTemplates.length === 0) {
                 this.emptyStateGroup.visible = true;
+                this.add(this.emptyStateGroup);
+                this.emptyStateAdded = true;
+
+                this.archiveGroup.visible = false;
+                this.add(this.archiveGroup);
+                this.archiveAdded = true;
                 return;
             }
 
-            this.emptyStateGroup.visible = false;
+            this.emptyStateGroup.visible = templates.length === 0;
+            if (this.emptyStateGroup.visible) {
+                this.add(this.emptyStateGroup);
+                this.emptyStateAdded = true;
+            }
 
-            // Group by category
+            // Group Active by category
             templates.forEach(t => {
                 const cat = t.category || 'Miscellaneous';
                 if (!this.groups[cat]) {
@@ -77,7 +113,7 @@ export const TaskView = GObject.registerClass(
 
                 // Add Actions
                 const performBtn = new Gtk.Button({
-                    icon_name: 'object-select-symbolic',
+                    icon_name: 'running-symbolic',
                     css_classes: ['circular', 'suggested-action'],
                     valign: Gtk.Align.CENTER,
                     tooltip_text: 'Perform Task',
@@ -85,7 +121,7 @@ export const TaskView = GObject.registerClass(
                 performBtn.connect('clicked', () => this._handleAction(t, 'Performed'));
 
                 const skipBtn = new Gtk.Button({
-                    icon_name: 'window-close-symbolic',
+                    icon_name: 'media-skip-forward-symbolic',
                     css_classes: ['circular', 'destructive-action'],
                     valign: Gtk.Align.CENTER,
                     margin_start: 6,
@@ -111,22 +147,107 @@ export const TaskView = GObject.registerClass(
                     subtitle: `${t.schedule_type} (${t.interval_value || 'N/A'})`
                 });
 
-                // Add Delete to expanded content
-                const delBtn = new Gtk.Button({
-                    icon_name: 'user-trash-symbolic',
-                    css_classes: ['flat', 'destructive-action'],
+                // Add Menu Popover for extra actions
+                const menuButton = new Gtk.MenuButton({
+                    icon_name: 'open-menu-symbolic',
+                    css_classes: ['flat'],
                     valign: Gtk.Align.CENTER,
+                    tooltip_text: 'Task Options'
                 });
-                delBtn.connect('clicked', () => {
-                    DB.deleteTaskTemplate(t.id);
+
+                const popover = new Gtk.Popover();
+                popover.add_css_class('menu');
+                const popoverBox = new Gtk.Box({
+                    orientation: Gtk.Orientation.VERTICAL,
+                    spacing: 0,
+                    margin_top: 6, margin_bottom: 6, margin_start: 6, margin_end: 6
+                });
+
+                const pastActivitiesBtn = new Gtk.Button({ label: 'Past Activities', css_classes: ['flat'] });
+                pastActivitiesBtn.connect('clicked', () => {
+                    popover.popdown();
+                    this._showPastActivities(t);
+                });
+
+                const archiveBtn = new Gtk.Button({ label: 'Archive Task', css_classes: ['flat'] });
+                archiveBtn.connect('clicked', () => {
+                    popover.popdown();
+                    DB.archiveTaskTemplate(t.id);
                     this.refreshData();
                 });
-                cfgRow.add_suffix(delBtn);
+
+                const deleteBtn = new Gtk.Button({ label: 'Delete Task', css_classes: ['flat', 'destructive-action'] });
+                deleteBtn.connect('clicked', () => {
+                    popover.popdown();
+                    this._confirmDeleteTask(t);
+                });
+
+                popoverBox.append(pastActivitiesBtn);
+                popoverBox.append(archiveBtn);
+                popoverBox.append(deleteBtn);
+                popover.set_child(popoverBox);
+                menuButton.set_popover(popover);
+
+                cfgRow.add_suffix(menuButton);
 
                 row.add_row(cfgRow);
 
                 this.groups[cat].add(row);
             });
+
+            // Populate Archived Section
+            if (archivedTemplates.length === 0) {
+                this.archiveGroup.visible = false;
+            } else {
+                this.archiveGroup.visible = true;
+
+                // If we can't cleanly clear an ExpanderRow, it's safer to recreate it.
+                this.archiveGroup.remove(this.archiveExpander);
+                this.archiveExpander = new Adw.ExpanderRow({
+                    title: 'Archived Tasks',
+                    icon_name: 'drawer-symbolic',
+                });
+                this.archiveGroup.add(this.archiveExpander);
+
+                archivedTemplates.forEach(t => {
+                    const row = new Adw.ActionRow({
+                        title: t.title,
+                        subtitle: t.category,
+                    });
+
+                    const restoreBtn = new Gtk.Button({
+                        icon_name: 'archive-extract-symbolic',
+                        css_classes: ['flat'],
+                        valign: Gtk.Align.CENTER,
+                        tooltip_text: 'Restore Task'
+                    });
+                    restoreBtn.connect('clicked', () => {
+                        DB.restoreTaskTemplate(t.id);
+                        this.refreshData();
+                    });
+
+                    const delBtn = new Gtk.Button({
+                        icon_name: 'edit-delete-symbolic',
+                        css_classes: ['flat', 'destructive-action'],
+                        valign: Gtk.Align.CENTER,
+                        tooltip_text: 'Delete Permanently'
+                    });
+                    delBtn.connect('clicked', () => {
+                        this._confirmDeleteTask(t);
+                    });
+
+                    const box = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6 });
+                    box.append(restoreBtn);
+                    box.append(delBtn);
+
+                    row.add_suffix(box);
+                    this.archiveExpander.add_row(row);
+                });
+            }
+
+            // Always add archive group at the very end
+            this.add(this.archiveGroup);
+            this.archiveAdded = true;
         }
 
         _handleAction(template, actionStr) {
@@ -135,6 +256,32 @@ export const TaskView = GObject.registerClass(
             dialog.connect('activity-logged', () => {
                 this.refreshData();
             });
+            dialog.present(rootWindow);
+        }
+
+        _confirmDeleteTask(template) {
+            const rootWindow = this.get_root();
+            const dialog = new Adw.AlertDialog({
+                heading: 'Delete Task?',
+                body: `Are you sure you want to delete '${template.title}' and all previously completed activities for this task?`,
+            });
+            dialog.add_response('cancel', 'Cancel');
+            dialog.add_response('delete', 'Delete');
+            dialog.set_response_appearance('delete', Adw.ResponseAppearance.DESTRUCTIVE);
+
+            dialog.connect('response', (dlg, response) => {
+                if (response === 'delete') {
+                    DB.permanentlyDeleteTaskTemplate(template.id);
+                    this.refreshData();
+                }
+            });
+
+            dialog.present(rootWindow);
+        }
+
+        _showPastActivities(template) {
+            const rootWindow = this.get_root();
+            const dialog = new PastActivitiesDialog(rootWindow, template);
             dialog.present(rootWindow);
         }
     }
