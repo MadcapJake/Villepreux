@@ -18,7 +18,7 @@ export const DashboardView = GObject.registerClass(
             // Parameters Tab
             const paramView = new ParameterView(tank);
             this._stack.add_titled(paramView, 'parameters', 'Parameters');
-            this._stack.get_page(paramView).set_icon_name('water-drop-symbolic');
+            this._stack.get_page(paramView).set_icon_name('thermometer-symbolic');
 
             // Livestock Tab
             const livestockView = new LivestockView(tank);

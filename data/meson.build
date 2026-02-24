@@ -38,3 +38,13 @@ install_data(
   install_dir: join_paths(get_option('datadir'), 'icons/hicolor/512x512/apps'),
   rename: 'com.github.madcapjake.Villepreux.png'
 )
+
+install_data(
+  'fish-symbolic.svg',
+  install_dir: join_paths(get_option('datadir'), 'icons/hicolor/symbolic/apps')
+)
+
+install_data(
+  'thermometer-symbolic.svg',
+  install_dir: join_paths(get_option('datadir'), 'icons/hicolor/symbolic/apps')
+)
