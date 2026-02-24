@@ -263,6 +263,14 @@ export const VillepreuxWindow = GObject.registerClass(
                 this._updateHeaderButtons(dashboard.stack);
             });
 
+            // Connect signal for multi-select mode on parameter view
+            const paramView = dashboard.stack.get_child_by_name('parameters');
+            if (paramView) {
+                paramView.connect('notify::isMultiSelectMode', () => {
+                    this._updateHeaderButtons(dashboard.stack);
+                });
+            }
+
             // Initial button update
             this._updateHeaderButtons(dashboard.stack);
 
@@ -283,11 +291,15 @@ export const VillepreuxWindow = GObject.registerClass(
                 this._contentHeader.remove(this._activeHeaderButton);
                 this._activeHeaderButton = null;
             }
-            // -- Clear existing back button (start) --
+            // -- Clear existing back button, toggle mode buttons (start) --
             if (this._backButton) {
                 console.log(`[Window] Removing back button`);
                 this._contentHeader.remove(this._backButton);
                 this._backButton = null;
+            }
+            if (this._multiSelectButton) {
+                this._contentHeader.remove(this._multiSelectButton);
+                this._multiSelectButton = null;
             }
 
             if (!stack) return;
@@ -295,23 +307,33 @@ export const VillepreuxWindow = GObject.registerClass(
             const visibleChild = stack.visible_child;
             const visibleName = stack.get_visible_child_name();
 
-            // -- Add Action Button --
+            // -- Add Action Button (End) --
             let btn = null;
 
             if (visibleName === 'parameters') {
-                btn = new Gtk.Button({
-                    label: 'Add Test Result',
-                    css_classes: ['suggested-action'],
-                });
-                btn.connect('clicked', () => {
-                    const dialog = new LogParameterDialog(this, this._currentTank);
-                    dialog.connect('parameters-logged', () => {
-                        if (visibleChild && typeof visibleChild._refreshGrid === 'function') {
-                            visibleChild._refreshGrid();
-                        }
+                if (visibleChild && visibleChild.isMultiSelectMode) {
+                    btn = new Gtk.Button({
+                        label: 'Analyze',
+                        css_classes: ['suggested-action'],
                     });
-                    dialog.present();
-                });
+                    btn.connect('clicked', () => {
+                        visibleChild.openAnalysis();
+                    });
+                } else {
+                    btn = new Gtk.Button({
+                        label: 'Add Test Result',
+                        css_classes: ['suggested-action'],
+                    });
+                    btn.connect('clicked', () => {
+                        const dialog = new LogParameterDialog(this, this._currentTank);
+                        dialog.connect('parameters-logged', () => {
+                            if (visibleChild && typeof visibleChild._refreshGrid === 'function') {
+                                visibleChild._refreshGrid();
+                            }
+                        });
+                        dialog.present();
+                    });
+                }
             } else if (visibleName === 'livestock') {
                 btn = new Gtk.Button({
                     label: 'Add Inhabitant',
@@ -347,8 +369,10 @@ export const VillepreuxWindow = GObject.registerClass(
                 const updateBackBtn = () => {
                     if (navView.visible_page && navView.visible_page.tag !== 'root') {
                         backBtn.visible = true;
+                        if (this._multiSelectButton) this._multiSelectButton.visible = false;
                     } else {
                         backBtn.visible = false;
+                        if (this._multiSelectButton) this._multiSelectButton.visible = true;
                     }
                 };
 
@@ -364,6 +388,36 @@ export const VillepreuxWindow = GObject.registerClass(
 
                 this._contentHeader.pack_start(backBtn);
                 this._backButton = backBtn;
+            }
+
+            // -- Add Multi Select Button (Start) --
+            if (visibleName === 'parameters') {
+                const multiBtn = new Gtk.Button({
+                    icon_name: 'object-select-symbolic',
+                    tooltip_text: 'Select Parameters for Analyzing'
+                });
+
+                // Add an active class if currently toggled
+                if (visibleChild && visibleChild.isMultiSelectMode) {
+                    multiBtn.add_css_class('suggested-action');
+                }
+
+                multiBtn.connect('clicked', () => {
+                    if (visibleChild && typeof visibleChild.toggleMultiSelectMode === 'function') {
+                        visibleChild.toggleMultiSelectMode();
+                    }
+                });
+
+                // Only visible when on the root page
+                if (visibleChild && visibleChild.navigationView) {
+                    const navView = visibleChild.navigationView;
+                    if (navView.visible_page && navView.visible_page.tag !== 'root') {
+                        multiBtn.visible = false;
+                    }
+                }
+
+                this._contentHeader.pack_start(multiBtn);
+                this._multiSelectButton = multiBtn;
             }
         }
     }

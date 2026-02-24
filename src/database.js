@@ -103,6 +103,7 @@ function _createTables() {
             min_value REAL,
             max_value REAL,
             unit TEXT,
+            color TEXT DEFAULT '#3584e4',
             FOREIGN KEY(tank_id) REFERENCES tanks(id)
         )`,
         `CREATE TABLE IF NOT EXISTS tasks (
@@ -177,7 +178,8 @@ export function getParameterDefinitions(tankId) {
                 name: dm.get_value_at(2, i),
                 min_value: dm.get_value_at(3, i),
                 max_value: dm.get_value_at(4, i),
-                unit: dm.get_value_at(5, i)
+                unit: dm.get_value_at(5, i),
+                color: dm.get_value_at(6, i) || '#3584e4'
             });
         }
         return defs;
@@ -191,12 +193,13 @@ export function upsertParameterDefinition(def) {
     if (!_connection) return null;
     try {
         let sql;
+        const color = def.color || '#3584e4';
         if (def.id) {
             // Update
-            sql = `UPDATE parameter_definitions SET name='${def.name}', min_value=${def.min_value}, max_value=${def.max_value}, unit='${def.unit}' WHERE id=${def.id}`;
+            sql = `UPDATE parameter_definitions SET name='${def.name}', min_value=${def.min_value}, max_value=${def.max_value}, unit='${def.unit}', color='${color}' WHERE id=${def.id}`;
         } else {
             // Insert
-            sql = `INSERT INTO parameter_definitions (tank_id, name, min_value, max_value, unit) VALUES (${def.tank_id}, '${def.name}', ${def.min_value}, ${def.max_value}, '${def.unit}')`;
+            sql = `INSERT INTO parameter_definitions (tank_id, name, min_value, max_value, unit, color) VALUES (${def.tank_id}, '${def.name}', ${def.min_value}, ${def.max_value}, '${def.unit}', '${color}')`;
         }
         _connection.execute_non_select_command(sql);
 
@@ -466,4 +469,55 @@ export function getLivestockEventsByDate(dateStr) {
         console.error('Failed to get livestock events by date:', e);
         return { purchased: [], introduced: [] };
     }
+}
+
+export function getEventsInRange(tankId, startDate) {
+    if (!_connection) return [];
+
+    // Returns a unified list of events: { date: 'YYYY-MM-DD', label: '...', type: 'task|livestock' }
+    const events = [];
+
+    try {
+        // 1. Tasks Completed
+        const taskSql = `
+            SELECT title, last_completed 
+            FROM tasks 
+            WHERE tank_id = ${tankId} 
+              AND last_completed >= '${startDate}' 
+              AND last_completed IS NOT NULL AND last_completed != ''
+        `;
+        const taskDm = _connection.execute_select_command(taskSql);
+        for (let i = 0; i < taskDm.get_n_rows(); i++) {
+            events.push({
+                type: 'task',
+                label: `Completed Task: ${taskDm.get_value_at(0, i)}`,
+                date: taskDm.get_value_at(1, i).split('T')[0] // normalize
+            });
+        }
+
+        // 2. Livestock Introduced
+        const lsSql = `
+            SELECT name, introduced_date
+            FROM livestock
+            WHERE tank_id = ${tankId}
+              AND introduced_date >= '${startDate}'
+              AND introduced_date IS NOT NULL AND introduced_date != ''
+        `;
+        const lsDm = _connection.execute_select_command(lsSql);
+        for (let i = 0; i < lsDm.get_n_rows(); i++) {
+            events.push({
+                type: 'livestock',
+                label: `Introduced Livestock: ${lsDm.get_value_at(0, i)}`,
+                date: lsDm.get_value_at(1, i).split('T')[0]
+            });
+        }
+
+        // 3. Livestock Purchased (if different from introduced?)
+        // Skip for now to avoid duplicates if they are the same date.
+
+    } catch (e) {
+        console.error('Failed to get events in range:', e);
+    }
+
+    return events;
 }

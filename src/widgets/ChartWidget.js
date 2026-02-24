@@ -62,9 +62,13 @@ export const ChartWidget = GObject.registerClass(
 
             // Draw line graph
             if (pts.length > 0) {
-                // Determine line color based on whether the latest is in bounds?
-                // For now just standard blue
-                cr.setSourceRGBA(0.2, 0.5, 0.9, 1.0);
+                // Parse hex color from def or default to blue
+                const hex = this.def.color || '#3584e4';
+                let r = parseInt(hex.slice(1, 3), 16) / 255 || 0.2;
+                let g = parseInt(hex.slice(3, 5), 16) / 255 || 0.5;
+                let b = parseInt(hex.slice(5, 7), 16) / 255 || 0.9;
+
+                cr.setSourceRGBA(r, g, b, 1.0);
                 cr.setLineWidth(2.0);
 
                 pts.forEach((pt, i) => {
@@ -86,7 +90,7 @@ export const ChartWidget = GObject.registerClass(
                     const y = h - ((pt.value - minVal) / range) * h;
 
                     cr.arc(x, y, 4, 0, 2 * Math.PI);
-                    cr.setSourceRGBA(0.2, 0.5, 0.9, 1.0);
+                    cr.setSourceRGBA(r, g, b, 1.0);
                     cr.fill();
 
                     // Small white outline for contrast

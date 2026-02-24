@@ -5,12 +5,38 @@ import Adw from 'gi://Adw';
 import * as DB from '../database.js';
 import { LogSingleParameterDialog } from './LogSingleParameterDialog.js';
 import { ChartWidget } from '../widgets/ChartWidget.js';
+import { AnalyzeParametersDialog } from './AnalyzeParametersDialog.js';
+import Gdk from 'gi://Gdk';
 
 export const ParameterView = GObject.registerClass(
+    {
+        Properties: {
+            'isMultiSelectMode': GObject.ParamSpec.boolean(
+                'isMultiSelectMode',
+                'Is Multi Select Mode',
+                'Whether the view is in multi-select mode',
+                GObject.ParamFlags.READABLE,
+                false
+            ),
+        }
+    },
     class ParameterView extends Adw.Bin {
         _init(tank) {
             super._init();
             this.tank = tank;
+
+            if (!globalThis.villepreuxCustomCssLoaded) {
+                const css = `
+                    .selected-card {
+                        box-shadow: inset 0 0 0 2px @accent_color;
+                        background-color: alpha(@accent_color, 0.1);
+                    }
+                `;
+                const provider = new Gtk.CssProvider();
+                provider.load_from_string(css);
+                Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+                globalThis.villepreuxCustomCssLoaded = true;
+            }
 
             this._navView = new Adw.NavigationView();
 
@@ -47,6 +73,10 @@ export const ParameterView = GObject.registerClass(
                 row_spacing: 12,
             });
 
+            // Multi-select state
+            this._isMultiSelectMode = false;
+            this._selectedParameters = new Set();
+
             this._refreshGrid();
 
             mainBox.append(this._flowBox);
@@ -58,8 +88,47 @@ export const ParameterView = GObject.registerClass(
             this.set_child(this._navView);
         }
 
+        toggleMultiSelectMode() {
+            this._isMultiSelectMode = !this._isMultiSelectMode;
+
+            if (!this._isMultiSelectMode) {
+                this._selectedParameters.clear();
+            }
+
+            // Redraw grid to show/hide checkboxes and "add parameter" card
+            this._refreshGrid();
+        }
+
+        get selectedParameters() {
+            return Array.from(this._selectedParameters);
+        }
+
+        get isMultiSelectMode() {
+            return this._isMultiSelectMode;
+        }
+
+        openAnalysis() {
+            if (this._selectedParameters.size === 0) return;
+            console.log("Analyze clicked! Selected: ", Array.from(this._selectedParameters));
+            const selectedDefs = DB.getParameterDefinitions(this.tank.id)
+                .filter(d => this._selectedParameters.has(d.name));
+
+            // Spawn AnalyzeParametersDialog
+            const rootWindow = this.get_root();
+            const dialog = new AnalyzeParametersDialog(rootWindow, this.tank, Array.from(this._selectedParameters));
+
+            dialog.connect('close-request', () => {
+                // Exit multi select on close
+                if (this.isMultiSelectMode) {
+                    this.toggleMultiSelectMode();
+                }
+            });
+
+            dialog.present();
+        }
+
         _refreshGrid() {
-            console.log(`[ParameterView] Refreshing grid for tank: ${this.tank.id}`);
+            console.log(`[ParameterView] Refreshing grid for tank: ${this.tank.id}, multiSelect: ${this._isMultiSelectMode}`);
             this._flowBox.remove_all();
 
             const defs = DB.getParameterDefinitions(this.tank.id);
@@ -69,9 +138,14 @@ export const ParameterView = GObject.registerClass(
                 this._flowBox.append(card);
             });
 
-            // "Add Parameter" Card (Last item)
-            const addCard = this._createAddCard();
-            this._flowBox.append(addCard);
+            // "Add Parameter" Card (Last item) - hidden in multi-select mode
+            if (!this._isMultiSelectMode) {
+                const addCard = this._createAddCard();
+                this._flowBox.append(addCard);
+            }
+
+            // Fire an event so the window can update its header buttons
+            this.notify('isMultiSelectMode');
         }
 
         get navigationView() {
@@ -149,8 +223,55 @@ export const ParameterView = GObject.registerClass(
 
             button.set_child(mainBox);
 
+            if (this._selectedParameters.has(def.name)) {
+                button.add_css_class('selected-card');
+            }
+
+            // Click behavior for multi-select (shift-click or multi-select mode)
+            const clickController = new Gtk.GestureClick({
+                button: 0, // all buttons
+            });
+            clickController.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+
+            clickController.connect('pressed', (gesture, n_press, x, y) => {
+                const state = gesture.get_current_event_state();
+                const shiftPressed = state && ((state & Gdk.ModifierType.SHIFT_MASK) !== 0);
+
+                if (this._isMultiSelectMode || shiftPressed) {
+                    gesture.set_state(Gtk.EventSequenceState.CLAIMED);
+                }
+            });
+
+            clickController.connect('released', (gesture, n_press, x, y) => {
+                const state = gesture.get_current_event_state();
+                const shiftPressed = state && ((state & Gdk.ModifierType.SHIFT_MASK) !== 0);
+
+                if (this._isMultiSelectMode || shiftPressed) {
+                    if (this._selectedParameters.has(def.name)) {
+                        this._selectedParameters.delete(def.name);
+                        button.remove_css_class('selected-card');
+
+                        // If no more parameters selected, exit multi-select mode
+                        if (this._selectedParameters.size === 0 && this._isMultiSelectMode) {
+                            this.toggleMultiSelectMode();
+                        }
+                    } else {
+                        this._selectedParameters.add(def.name);
+                        button.add_css_class('selected-card');
+
+                        if (!this._isMultiSelectMode) {
+                            this.toggleMultiSelectMode();
+                        }
+                    }
+                }
+            });
+            button.add_controller(clickController);
+
+            // Normal navigation
             button.connect('clicked', () => {
-                this._navigateToDetail(def);
+                if (!this._isMultiSelectMode) {
+                    this._navigateToDetail(def);
+                }
             });
 
             return button;
@@ -246,6 +367,7 @@ export const ParameterView = GObject.registerClass(
 
             // State for edits
             const edits = { ...def };
+            if (!edits.color) edits.color = '#3584e4'; // default blue
 
             saveBtn.connect('clicked', () => {
                 // Validate (?)
@@ -318,6 +440,35 @@ export const ParameterView = GObject.registerClass(
                 onConfigChanged();
             });
             configGroup.add(unitRow);
+
+            // Graph Color
+            const colorDialog = new Gtk.ColorDialog();
+            const colorBtn = new Gtk.ColorDialogButton({
+                dialog: colorDialog,
+                valign: Gtk.Align.CENTER,
+            });
+
+            // Set initial color
+            const initialColor = new Gdk.RGBA();
+            initialColor.parse(edits.color);
+            colorBtn.rgba = initialColor;
+
+            colorBtn.connect('notify::rgba', () => {
+                const rgba = colorBtn.rgba;
+                // Convert back to hex string #RRGGBB
+                const r = Math.round(rgba.red * 255).toString(16).padStart(2, '0');
+                const g = Math.round(rgba.green * 255).toString(16).padStart(2, '0');
+                const b = Math.round(rgba.blue * 255).toString(16).padStart(2, '0');
+                edits.color = `#${r}${g}${b}`;
+                onConfigChanged();
+            });
+
+            const colorRow = new Adw.ActionRow({
+                title: 'Graph Color',
+            });
+            colorRow.add_suffix(colorBtn);
+            colorRow.activatable_widget = colorBtn;
+            configGroup.add(colorRow);
 
             mainBox.append(configGroup);
 
