@@ -3,7 +3,7 @@ import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
 
 import * as DB from '../database.js';
-import { MultiChartWidget } from '../widgets/MultiChartWidget.js';
+import { ChartWidget } from '../widgets/ChartWidget.js';
 
 export const AnalyzeParametersDialog = GObject.registerClass(
     class AnalyzeParametersDialog extends Adw.Window {
@@ -75,7 +75,11 @@ export const AnalyzeParametersDialog = GObject.registerClass(
                 height_request: 300,
             });
 
-            this.chartWidget = new MultiChartWidget(this.tank, this.defs, this._getDateRangeString());
+            this.chartWidget = new ChartWidget({
+                mode: 'analyze',
+                tank: this.tank
+            });
+            this.chartWidget.setAnalysisData(this.tank, this.defs, this._getDateRangeString());
             chartFrame.set_child(this.chartWidget);
             mainBox.append(chartFrame);
 
@@ -116,7 +120,7 @@ export const AnalyzeParametersDialog = GObject.registerClass(
             console.log('[AnalyzeParametersDialog] Refreshing data for cutoff: ', cutoffDateStr);
 
             // 1. Fetch data for multi-chart
-            this.chartWidget.updateData(cutoffDateStr);
+            this.chartWidget.setAnalysisData(this.tank, this.defs, cutoffDateStr);
 
             // 2. Fetch events (Tasks completed + Livestock Introduced/Purchased)
             // Note: Our DB methods getTasksByDate only grab exact days. To do a range, we'll
@@ -126,7 +130,7 @@ export const AnalyzeParametersDialog = GObject.registerClass(
 
             const events = DB.getEventsInRange(this.tank.id, cutoffDateStr);
 
-            this.chartWidget.updateEvents(events);
+            this.chartWidget.setEvents(events);
 
             let child = this.eventsContainer.get_first_child();
             while (child) {

@@ -176,7 +176,8 @@ export const ParameterView = GObject.registerClass(
             const history = DB.getParameterHistory(this.tank.id, def.name);
 
             // Mini-chart
-            const chart = new ChartWidget(def, history);
+            const chart = new ChartWidget({ mode: 'mini' });
+            chart.setData(def, history);
             chart.height_request = 60;
             chart.margin_bottom = 12;
 
@@ -517,8 +518,8 @@ export const ParameterView = GObject.registerClass(
 
                     const results = DB.getParameterHistory(this.tank.id, def.name);
 
-                    if (largeChart && typeof largeChart.updateData === 'function') {
-                        largeChart.updateData(results);
+                    if (largeChart && typeof largeChart.setData === 'function') {
+                        largeChart.setData(def, results);
                     }
 
                     if (results.length === 0) {

@@ -12,7 +12,6 @@
     <file>views/TaskView.js</file>
     <file>views/GlobalDashboardView.js</file>
     <file>widgets/ChartWidget.js</file>
-    <file>widgets/MultiChartWidget.js</file>
     <file>views/AnalyzeParametersDialog.js</file>
     <file>views/LogSingleParameterDialog.js</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/fish-symbolic.svg</file>
