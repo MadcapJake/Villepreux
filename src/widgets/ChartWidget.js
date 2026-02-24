@@ -20,13 +20,11 @@ export const ChartWidget = GObject.registerClass(
             this.renderedPoints = [];
             this.renderedEvents = [];
 
-            // Tooltips only for detail and analyze modes
-            if (this.mode !== 'mini') {
-                this.set_has_tooltip(true);
-                this.connect('query-tooltip', (widget, x, y, keyboard_tooltip, tooltip) => {
-                    return this._onQueryTooltip(x, y, tooltip);
-                });
-            }
+            // Enable tooltips on all charts
+            this.set_has_tooltip(true);
+            this.connect('query-tooltip', (widget, x, y, keyboard_tooltip, tooltip) => {
+                return this._onQueryTooltip(x, y, tooltip);
+            });
 
             this.set_draw_func((area, cr, width, height) => this._draw(cr, width, height));
 
