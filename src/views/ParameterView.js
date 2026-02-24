@@ -166,7 +166,10 @@ export const ParameterView = GObject.registerClass(
             const bodyBox = new Gtk.Box({
                 orientation: Gtk.Orientation.VERTICAL,
                 spacing: 6,
-                css_classes: ['p-12'],
+                margin_start: 12,
+                margin_end: 12,
+                margin_top: 12,
+                margin_bottom: 12,
                 vexpand: true,
             });
 
@@ -209,7 +212,10 @@ export const ParameterView = GObject.registerClass(
             const footerBox = new Gtk.Box({
                 orientation: Gtk.Orientation.HORIZONTAL,
                 spacing: 12,
-                css_classes: ['p-12'],
+                margin_start: 12,
+                margin_end: 12,
+                margin_top: 12,
+                margin_bottom: 12,
             });
 
             const rangeLabel = new Gtk.Label({
@@ -287,7 +293,10 @@ export const ParameterView = GObject.registerClass(
             const card = new Gtk.Box({
                 orientation: Gtk.Orientation.VERTICAL,
                 spacing: 12,
-                css_classes: ['p-12'],
+                margin_start: 12,
+                margin_end: 12,
+                margin_top: 12,
+                margin_bottom: 12,
                 valign: Gtk.Align.CENTER,
                 halign: Gtk.Align.CENTER,
             });
