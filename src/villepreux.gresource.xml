@@ -4,12 +4,14 @@
     <file>main.js</file>
     <file>window.js</file>
     <file>database.js</file>
+    <file>utils/icons.js</file>
     <file>views/AddTankDialog.js</file>
     <file>views/DashboardView.js</file>
     <file>views/ParameterView.js</file>
     <file>views/LogParameterDialog.js</file>
     <file>views/LivestockView.js</file>
     <file>views/TaskView.js</file>
+    <file>views/CopyTaskDialog.js</file>
     <file>views/LogTaskActivityDialog.js</file>
     <file>views/CreateTaskTemplateDialog.js</file>
     <file>views/GlobalDashboardView.js</file>
@@ -23,5 +25,10 @@
     <file preprocess="xml-stripblanks">icons/scalable/actions/drawer-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/archive-extract-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/edit-delete-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/drinking-fountain-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/pharmacy-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/restaurant-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/seal-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/wrench-wide-symbolic.svg</file>
   </gresource>
 </gresources>

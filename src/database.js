@@ -335,7 +335,7 @@ export function getParametersByDate(dateStr) {
     if (!_connection) return [];
     try {
         const sql = `
-            SELECT p.id, t.name as tank_name, p.type, p.value, pd.unit
+            SELECT p.id, p.tank_id, t.name as tank_name, p.type, p.value, pd.unit
             FROM parameters p
             JOIN tanks t ON p.tank_id = t.id
             LEFT JOIN parameter_definitions pd ON p.tank_id = pd.tank_id AND p.type = pd.name
@@ -348,10 +348,11 @@ export function getParametersByDate(dateStr) {
         for (let i = 0; i < numRows; i++) {
             results.push({
                 id: dm.get_value_at(0, i),
-                tank_name: dm.get_value_at(1, i),
-                type: dm.get_value_at(2, i),
-                value: dm.get_value_at(3, i),
-                unit: dm.get_value_at(4, i)
+                tank_id: dm.get_value_at(1, i),
+                tank_name: dm.get_value_at(2, i),
+                type: dm.get_value_at(3, i),
+                value: dm.get_value_at(4, i),
+                unit: dm.get_value_at(5, i)
             });
         }
         return results;
@@ -422,35 +423,53 @@ export function deleteParameterRecord(id) {
 }
 
 export function getTasksByDate(dateStr) {
-    if (!_connection) return { due: [], completed: [] };
+    if (!_connection) return { due: [], activities: [] };
     try {
-        const sql = `
-            SELECT t.id, tk.name as tank_name, t.title, t.next_due_date,
-                   (SELECT MAX(execution_date) FROM task_activities WHERE task_template_id = t.id AND action_taken = 'Performed') as last_completed
+        const dueSql = `
+            SELECT t.id, tk.id as tank_id, tk.name as tank_name, t.title, t.next_due_date, t.category
             FROM task_templates t
             JOIN tanks tk ON t.tank_id = tk.id
-            WHERE t.next_due_date LIKE '${dateStr}%' 
-               OR EXISTS (SELECT 1 FROM task_activities WHERE task_template_id = t.id AND action_taken = 'Performed' AND execution_date LIKE '${dateStr}%')
+            WHERE t.next_due_date LIKE '${dateStr}%' AND t.status != 'Archived'
         `;
-        const dm = _connection.execute_select_command(sql);
-        const numRows = dm.get_n_rows();
+        let dm = _connection.execute_select_command(dueSql);
+        let numRows = dm.get_n_rows();
         const due = [];
-        const completed = [];
         for (let i = 0; i < numRows; i++) {
-            const nextDueStr = dm.get_value_at(3, i) || '';
-            const lastCompletedStr = dm.get_value_at(4, i) || '';
-            const task = {
+            due.push({
                 id: dm.get_value_at(0, i),
-                tank_name: dm.get_value_at(1, i),
-                title: dm.get_value_at(2, i)
-            };
-            if (nextDueStr.startsWith(dateStr)) due.push(task);
-            if (lastCompletedStr && lastCompletedStr.startsWith(dateStr)) completed.push(task);
+                tank_id: dm.get_value_at(1, i),
+                tank_name: dm.get_value_at(2, i),
+                title: dm.get_value_at(3, i),
+                category: dm.get_value_at(5, i)
+            });
         }
-        return { due, completed };
+
+        const actSql = `
+            SELECT a.id, tk.id as tank_id, tk.name as tank_name, t.title, a.action_taken, a.notes, t.category
+            FROM task_activities a
+            JOIN task_templates t ON a.task_template_id = t.id
+            JOIN tanks tk ON t.tank_id = tk.id
+            WHERE a.execution_date LIKE '${dateStr}%'
+        `;
+        dm = _connection.execute_select_command(actSql);
+        numRows = dm.get_n_rows();
+        const activities = [];
+        for (let i = 0; i < numRows; i++) {
+            activities.push({
+                id: dm.get_value_at(0, i),
+                tank_id: dm.get_value_at(1, i),
+                tank_name: dm.get_value_at(2, i),
+                title: dm.get_value_at(3, i),
+                action_taken: dm.get_value_at(4, i),
+                notes: dm.get_value_at(5, i),
+                category: dm.get_value_at(6, i)
+            });
+        }
+
+        return { due, activities };
     } catch (e) {
         console.error('Failed to get tasks by date:', e);
-        return { due: [], completed: [] };
+        return { due: [], activities: [] };
     }
 }
 
@@ -620,13 +639,35 @@ export function upsertTaskTemplate(task) {
     }
 }
 
-export function archiveTaskTemplate(id) {
+export function archiveTaskTemplate(templateId) {
     if (!_connection) return;
     try {
-        const sql = `UPDATE task_templates SET status='Archived' WHERE id=${id}`;
+        const sql = `UPDATE task_templates SET status='Archived' WHERE id=${templateId}`;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to archive task template:', e);
+    }
+}
+
+export function copyTaskTemplate(templateId, targetTankId) {
+    if (!_connection) return;
+    try {
+        const fetchSql = `SELECT category, title, instructions, schedule_type, interval_value, next_due_date FROM task_templates WHERE id=${templateId}`;
+        const dm = _connection.execute_select_command(fetchSql);
+        if (dm.get_n_rows() > 0) {
+            const cat = dm.get_value_at(0, 0);
+            const title = dm.get_value_at(1, 0).replace(/'/g, "''");
+            const inst = (dm.get_value_at(2, 0) || '').replace(/'/g, "''");
+            const type = dm.get_value_at(3, 0);
+            const val = dm.get_value_at(4, 0);
+            const next = dm.get_value_at(5, 0);
+
+            const insertSql = `INSERT INTO task_templates (tank_id, category, title, instructions, schedule_type, interval_value, next_due_date, status)
+                               VALUES (${targetTankId}, '${cat}', '${title}', '${inst}', '${type}', ${val}, '${next}', 'Active')`;
+            _connection.execute_non_select_command(insertSql);
+        }
+    } catch (e) {
+        console.error('Failed to copy task template:', e);
     }
 }
 

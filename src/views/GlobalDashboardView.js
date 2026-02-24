@@ -1,8 +1,11 @@
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
+import GLib from 'gi://GLib';
 
 import * as DB from '../database.js';
+
+import { getTaskCategoryIcon } from '../utils/icons.js';
 
 export const GlobalDashboardView = GObject.registerClass(
     class GlobalDashboardView extends Adw.Bin {
@@ -161,6 +164,38 @@ export const GlobalDashboardView = GObject.registerClass(
                         title: `${p.type}: ${p.value}${unit}`,
                         subtitle: `Tank: ${p.tank_name}`,
                         icon_name: 'water-drop-symbolic',
+                        activatable: true,
+                    });
+                    row.connect('activated', () => {
+                        console.log(`[GlobalDashboardView] Test result clicked: ${p.type} on tank ${p.tank_name}`);
+                        const rootWindow = this.get_root();
+                        const tank = DB.getTanks().find(t => t.id === p.tank_id);
+                        if (tank && rootWindow && rootWindow._onTankSelected) {
+                            console.log(`[GlobalDashboardView] Found tank: ${tank.name}. Changing tank view...`);
+                            rootWindow._onTankSelected(tank);
+                            rootWindow._contentView.content.stack.set_visible_child_name('parameters');
+
+                            const dashboard = rootWindow._contentView.content;
+                            console.log(`[GlobalDashboardView] Dashboard resolved. parameterView attached? = ${!!dashboard.parameterView}`);
+                            if (dashboard.parameterView) {
+                                // Find full definition to pass into the detail view
+                                const defs = DB.getParameterDefinitions(tank.id);
+                                const fullDef = defs.find(d => d.name === p.type) || {
+                                    tank_id: tank.id, name: p.type, min_value: 0, max_value: 10, unit: p.unit
+                                };
+                                console.log(`[GlobalDashboardView] Delaying detail navigation for ${fullDef.name}...`);
+                                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                                    console.log(`[GlobalDashboardView] idle_add callback fired. Navigating to detail...`);
+                                    try {
+                                        dashboard.parameterView._navigateToDetail(fullDef);
+                                        console.log(`[GlobalDashboardView] Navigation successful.`);
+                                    } catch (e) {
+                                        console.error(`[GlobalDashboardView] Navigation failed: ${e}`);
+                                    }
+                                    return GLib.SOURCE_REMOVE;
+                                });
+                            }
+                        }
                     });
                     paramGroup.add(row);
                 });
@@ -174,25 +209,46 @@ export const GlobalDashboardView = GObject.registerClass(
                     const row = new Adw.ActionRow({
                         title: t.title,
                         subtitle: `Tank: ${t.tank_name}`,
-                        icon_name: 'task-due-symbolic',
+                        icon_name: getTaskCategoryIcon(t.category),
+                        activatable: true,
+                    });
+                    row.connect('activated', () => {
+                        const rootWindow = this.get_root();
+                        const tank = DB.getTanks().find(x => x.id === t.tank_id);
+                        if (tank && rootWindow && rootWindow._onTankSelected) {
+                            rootWindow._onTankSelected(tank);
+                            rootWindow._contentView.content.stack.set_visible_child_name('tasks');
+                        }
                     });
                     dueGroup.add(row);
                 });
                 this._detailsBox.append(dueGroup);
             }
 
-            if (tasks.completed.length > 0) {
+            if (tasks.activities && tasks.activities.length > 0) {
                 hasData = true;
-                const completedGroup = new Adw.PreferencesGroup({ title: 'Tasks Completed' });
-                tasks.completed.forEach(t => {
+                const actGroup = new Adw.PreferencesGroup({ title: 'Prior Activities' });
+                tasks.activities.forEach(a => {
+                    const titleStr = `Task '${a.title}' was ${a.action_taken.toLowerCase()} on tank '${a.tank_name}'`;
+                    const subtitleStr = a.notes || '';
+
                     const row = new Adw.ActionRow({
-                        title: t.title,
-                        subtitle: `Tank: ${t.tank_name}`,
-                        icon_name: 'emblem-ok-symbolic',
+                        title: titleStr,
+                        subtitle: subtitleStr,
+                        icon_name: getTaskCategoryIcon(a.category),
+                        activatable: true,
                     });
-                    completedGroup.add(row);
+                    row.connect('activated', () => {
+                        const rootWindow = this.get_root();
+                        const tank = DB.getTanks().find(x => x.id === a.tank_id);
+                        if (tank && rootWindow && rootWindow._onTankSelected) {
+                            rootWindow._onTankSelected(tank);
+                            rootWindow._contentView.content.stack.set_visible_child_name('tasks');
+                        }
+                    });
+                    actGroup.add(row);
                 });
-                this._detailsBox.append(completedGroup);
+                this._detailsBox.append(actGroup);
             }
 
             if (livestockEvents.purchased.length > 0) {

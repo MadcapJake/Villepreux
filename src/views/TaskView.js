@@ -5,6 +5,8 @@ import * as DB from '../database.js';
 import { LogTaskActivityDialog } from './LogTaskActivityDialog.js';
 import { CreateTaskTemplateDialog } from './CreateTaskTemplateDialog.js';
 import { PastActivitiesDialog } from './PastActivitiesDialog.js';
+import { CopyTaskDialog } from './CopyTaskDialog.js';
+import { getTaskCategoryIcon } from '../utils/icons.js';
 
 export const TaskView = GObject.registerClass(
     class TaskView extends Adw.PreferencesPage {
@@ -97,7 +99,17 @@ export const TaskView = GObject.registerClass(
             templates.forEach(t => {
                 const cat = t.category || 'Miscellaneous';
                 if (!this.groups[cat]) {
-                    this.groups[cat] = new Adw.PreferencesGroup({ title: cat });
+                    this.groups[cat] = new Adw.PreferencesGroup({
+                        title: cat,
+                    });
+
+                    const headerIcon = new Gtk.Image({
+                        icon_name: getTaskCategoryIcon(cat),
+                        css_classes: ['dim-label'],
+                        margin_bottom: 12
+                    });
+                    this.groups[cat].set_header_suffix(headerIcon);
+
                     this.add(this.groups[cat]);
                 }
 
@@ -169,6 +181,12 @@ export const TaskView = GObject.registerClass(
                     this._showPastActivities(t);
                 });
 
+                const copyBtn = new Gtk.Button({ label: 'Copy to...', css_classes: ['flat'] });
+                copyBtn.connect('clicked', () => {
+                    popover.popdown();
+                    this._showCopyTaskDialog(t);
+                });
+
                 const archiveBtn = new Gtk.Button({ label: 'Archive Task', css_classes: ['flat'] });
                 archiveBtn.connect('clicked', () => {
                     popover.popdown();
@@ -183,6 +201,7 @@ export const TaskView = GObject.registerClass(
                 });
 
                 popoverBox.append(pastActivitiesBtn);
+                popoverBox.append(copyBtn);
                 popoverBox.append(archiveBtn);
                 popoverBox.append(deleteBtn);
                 popover.set_child(popoverBox);
@@ -282,6 +301,21 @@ export const TaskView = GObject.registerClass(
         _showPastActivities(template) {
             const rootWindow = this.get_root();
             const dialog = new PastActivitiesDialog(rootWindow, template);
+            dialog.present(rootWindow);
+        }
+
+        _showCopyTaskDialog(template) {
+            const rootWindow = this.get_root();
+            const dialog = new CopyTaskDialog(rootWindow, template);
+            dialog.connect('task-copied', () => {
+                const toast = new Adw.Toast({ title: 'Task copied successfully' });
+                const appWindow = this.get_root().get_application().active_window;
+                if (appWindow && appWindow.addToast) {
+                    appWindow.addToast(toast);
+                } else {
+                    console.error("Could not find addToast on main window");
+                }
+            });
             dialog.present(rootWindow);
         }
     }

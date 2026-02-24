@@ -22,6 +22,8 @@ export const VillepreuxWindow = GObject.registerClass(
         }
 
         _setupUI() {
+            this._toastOverlay = new Adw.ToastOverlay();
+
             // Main layout container: OverlaySplitView (Better for collapsible sidebar)
             this._splitView = new Adw.OverlaySplitView({
                 min_sidebar_width: 250,
@@ -127,7 +129,8 @@ export const VillepreuxWindow = GObject.registerClass(
             breakpoint.add_setter(this._splitView, 'collapsed', true);
             this.add_breakpoint(breakpoint);
 
-            this.content = this._splitView;
+            this._toastOverlay.set_child(this._splitView);
+            this.content = this._toastOverlay;
 
             // Initial load
             this._refreshTankList();
@@ -427,6 +430,10 @@ export const VillepreuxWindow = GObject.registerClass(
                 this._contentHeader.pack_start(multiBtn);
                 this._multiSelectButton = multiBtn;
             }
+        }
+
+        addToast(toast) {
+            this._toastOverlay.add_toast(toast);
         }
     }
 );
