@@ -106,14 +106,26 @@ function _createTables() {
             color TEXT DEFAULT '#3584e4',
             FOREIGN KEY(tank_id) REFERENCES tanks(id)
         )`,
-        `CREATE TABLE IF NOT EXISTS tasks (
+        `CREATE TABLE IF NOT EXISTS task_templates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tank_id INTEGER,
+            equipment_id INTEGER,
+            category TEXT,
             title TEXT,
-            recurrence_days INTEGER,
-            last_completed TEXT,
-            next_due TEXT,
+            instructions TEXT,
+            schedule_type TEXT,
+            interval_value INTEGER,
+            next_due_date TEXT,
+            status TEXT DEFAULT 'Active',
             FOREIGN KEY(tank_id) REFERENCES tanks(id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS task_activities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_template_id INTEGER,
+            execution_date TEXT,
+            action_taken TEXT,
+            notes TEXT,
+            FOREIGN KEY(task_template_id) REFERENCES task_templates(id)
         )`
     ];
 
@@ -413,10 +425,12 @@ export function getTasksByDate(dateStr) {
     if (!_connection) return { due: [], completed: [] };
     try {
         const sql = `
-            SELECT t.id, tk.name as tank_name, t.title, t.next_due, t.last_completed
-            FROM tasks t
+            SELECT t.id, tk.name as tank_name, t.title, t.next_due_date,
+                   (SELECT MAX(execution_date) FROM task_activities WHERE task_template_id = t.id AND action_taken = 'Performed') as last_completed
+            FROM task_templates t
             JOIN tanks tk ON t.tank_id = tk.id
-            WHERE t.next_due LIKE '${dateStr}%' OR t.last_completed LIKE '${dateStr}%'
+            WHERE t.next_due_date LIKE '${dateStr}%' 
+               OR EXISTS (SELECT 1 FROM task_activities WHERE task_template_id = t.id AND action_taken = 'Performed' AND execution_date LIKE '${dateStr}%')
         `;
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
@@ -431,7 +445,7 @@ export function getTasksByDate(dateStr) {
                 title: dm.get_value_at(2, i)
             };
             if (nextDueStr.startsWith(dateStr)) due.push(task);
-            if (lastCompletedStr.startsWith(dateStr)) completed.push(task);
+            if (lastCompletedStr && lastCompletedStr.startsWith(dateStr)) completed.push(task);
         }
         return { due, completed };
     } catch (e) {
@@ -480,17 +494,17 @@ export function getEventsInRange(tankId, startDate) {
     try {
         // 1. Tasks Completed
         const taskSql = `
-            SELECT title, last_completed 
-            FROM tasks 
-            WHERE tank_id = ${tankId} 
-              AND last_completed >= '${startDate}' 
-              AND last_completed IS NOT NULL AND last_completed != ''
+            SELECT tt.title, ta.execution_date, ta.action_taken
+            FROM task_activities ta
+            JOIN task_templates tt ON ta.task_template_id = tt.id
+            WHERE tt.tank_id = ${tankId} 
+              AND ta.execution_date >= '${startDate}' 
         `;
         const taskDm = _connection.execute_select_command(taskSql);
         for (let i = 0; i < taskDm.get_n_rows(); i++) {
             events.push({
                 type: 'task',
-                label: `Completed Task: ${taskDm.get_value_at(0, i)}`,
+                label: `${taskDm.get_value_at(2, i)} Task: ${taskDm.get_value_at(0, i)}`,
                 date: taskDm.get_value_at(1, i).split('T')[0] // normalize
             });
         }
@@ -520,4 +534,91 @@ export function getEventsInRange(tankId, startDate) {
     }
 
     return events;
+}
+
+// ==========================================
+// Task Scheduler DAO
+// ==========================================
+
+export function getTaskTemplates(tankId) {
+    if (!_connection) return [];
+    try {
+        const sql = `SELECT * FROM task_templates WHERE tank_id = ${tankId} AND status = 'Active' ORDER BY category ASC, next_due_date ASC`;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const results = [];
+        for (let i = 0; i < numRows; i++) {
+            results.push({
+                id: dm.get_value_at(0, i),
+                tank_id: dm.get_value_at(1, i),
+                equipment_id: dm.get_value_at(2, i),
+                category: dm.get_value_at(3, i),
+                title: dm.get_value_at(4, i),
+                instructions: dm.get_value_at(5, i),
+                schedule_type: dm.get_value_at(6, i),
+                interval_value: dm.get_value_at(7, i),
+                next_due_date: dm.get_value_at(8, i),
+                status: dm.get_value_at(9, i)
+            });
+        }
+        return results;
+    } catch (e) {
+        console.error('Failed to get task templates:', e);
+        return [];
+    }
+}
+
+export function upsertTaskTemplate(task) {
+    if (!_connection) return;
+    try {
+        const title = task.title ? task.title.replace(/'/g, "''") : '';
+        const ins = task.instructions ? task.instructions.replace(/'/g, "''") : '';
+        const eqId = task.equipment_id || 'NULL';
+        const intVal = task.interval_value || 'NULL';
+        let sql;
+
+        if (task.id) {
+            sql = `UPDATE task_templates SET 
+                equipment_id=${eqId}, category='${task.category}', title='${title}', instructions='${ins}', 
+                schedule_type='${task.schedule_type}', interval_value=${intVal}, next_due_date='${task.next_due_date}' 
+                WHERE id=${task.id}`;
+        } else {
+            sql = `INSERT INTO task_templates (tank_id, equipment_id, category, title, instructions, schedule_type, interval_value, next_due_date, status) 
+                   VALUES (${task.tank_id}, ${eqId}, '${task.category}', '${title}', '${ins}', '${task.schedule_type}', ${intVal}, '${task.next_due_date}', 'Active')`;
+        }
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to upsert task template:', e);
+    }
+}
+
+export function deleteTaskTemplate(id) {
+    if (!_connection) return;
+    try {
+        // Soft delete
+        const sql = `UPDATE task_templates SET status='Archived' WHERE id=${id}`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to delete/archive task template:', e);
+    }
+}
+
+export function logTaskActivity(templateId, actionTaken, notes, executionDateStr, nextDueDateStr) {
+    if (!_connection) return;
+    try {
+        const safeNotes = notes ? notes.replace(/'/g, "''") : '';
+
+        // 1. Insert the log entry
+        const sqlLog = `INSERT INTO task_activities (task_template_id, execution_date, action_taken, notes) 
+                        VALUES (${templateId}, '${executionDateStr}', '${actionTaken}', '${safeNotes}')`;
+        _connection.execute_non_select_command(sqlLog);
+
+        // 2. Update the template's next_due_date
+        if (nextDueDateStr) {
+            const sqlUpdate = `UPDATE task_templates SET next_due_date='${nextDueDateStr}' WHERE id=${templateId}`;
+            _connection.execute_non_select_command(sqlUpdate);
+        }
+    } catch (e) {
+        console.error('Failed to log task activity:', e);
+    }
 }

@@ -117,14 +117,14 @@ export const ParameterView = GObject.registerClass(
             const rootWindow = this.get_root();
             const dialog = new AnalyzeParametersDialog(rootWindow, this.tank, Array.from(this._selectedParameters));
 
-            dialog.connect('close-request', () => {
+            dialog.connect('closed', () => {
                 // Exit multi select on close
                 if (this.isMultiSelectMode) {
                     this.toggleMultiSelectMode();
                 }
             });
 
-            dialog.present();
+            dialog.present(rootWindow);
         }
 
         _refreshGrid() {
@@ -363,7 +363,7 @@ export const ParameterView = GObject.registerClass(
                 css_classes: ['view'],
                 height_request: 300,
             });
-            const largeChart = new ChartWidget(def, []);
+            const largeChart = new ChartWidget({ mode: 'detail' });
             chartFrame.set_child(largeChart);
             mainBox.append(chartFrame);
 
@@ -512,7 +512,7 @@ export const ParameterView = GObject.registerClass(
                             refreshHistory();
                             this._refreshGrid(); // Update the card on the root page
                         });
-                        dialog.present();
+                        dialog.present(rootWindow);
                     });
                     historyGroup.header_suffix = headerSuffix;
 

@@ -6,15 +6,12 @@ import * as DB from '../database.js';
 import { ChartWidget } from '../widgets/ChartWidget.js';
 
 export const AnalyzeParametersDialog = GObject.registerClass(
-    class AnalyzeParametersDialog extends Adw.Window {
+    class AnalyzeParametersDialog extends Adw.Dialog {
         _init(parent, tank, selectedParameterNames) {
             super._init({
-                transient_for: parent,
-                modal: true,
                 title: 'Analyze Parameters',
-                default_width: 800,
-                default_height: 600,
-                hide_on_close: true,
+                content_width: 800,
+                content_height: 600,
             });
 
             this.tank = tank;
@@ -31,30 +28,19 @@ export const AnalyzeParametersDialog = GObject.registerClass(
             const toolbarView = new Adw.ToolbarView();
 
             const headerBar = new Adw.HeaderBar({
-                title_widget: new Gtk.Label({ label: 'Analysis', css_classes: ['title'] })
+                title_widget: new Gtk.Label({ label: 'Analyze Parameters', css_classes: ['title'] }),
+                show_end_title_buttons: false,
+                show_start_title_buttons: false
             });
 
-            // Removed custom close button to use the default one provided by Adw.HeaderBar
-
-            // Date Range Dropdown
-            const model = Gtk.StringList.new(['Last Week', 'Last Month', 'Last Quarter', 'Last Year']);
-            this.dateRangeDropdown = new Gtk.DropDown({
-                model: model,
-                valign: Gtk.Align.CENTER
+            const closeBtn = new Gtk.Button({
+                icon_name: 'window-close-symbolic',
+                css_classes: ['flat']
             });
-            // Default to 'Last Month'
-            this.dateRangeDropdown.set_selected(1);
+            closeBtn.connect('clicked', () => this.close());
+            headerBar.pack_end(closeBtn);
 
-            this.dateRangeDropdown.connect('notify::selected', () => {
-                this._refreshData();
-            });
-
-            headerBar.pack_end(this.dateRangeDropdown);
             toolbarView.add_top_bar(headerBar);
-
-            const scroll = new Gtk.ScrolledWindow({
-                hscrollbar_policy: Gtk.PolicyType.NEVER,
-            });
 
             const clamp = new Adw.Clamp({
                 maximum_size: 1000,
@@ -68,6 +54,29 @@ export const AnalyzeParametersDialog = GObject.registerClass(
                 orientation: Gtk.Orientation.VERTICAL,
                 spacing: 24,
             });
+
+            // Date Range Dropdown
+            const settingsGroup = new Adw.PreferencesGroup();
+
+            this.dateRangeRow = new Adw.ActionRow({
+                title: 'Date Range'
+            });
+
+            const model = Gtk.StringList.new(['Last Week', 'Last Month', 'Last Quarter', 'Last Year']);
+            this.dateRangeDropdown = new Gtk.DropDown({
+                model: model,
+                valign: Gtk.Align.CENTER
+            });
+            // Default to 'Last Month'
+            this.dateRangeDropdown.set_selected(1);
+
+            this.dateRangeDropdown.connect('notify::selected', () => {
+                this._refreshData();
+            });
+
+            this.dateRangeRow.add_suffix(this.dateRangeDropdown);
+            settingsGroup.add(this.dateRangeRow);
+            mainBox.append(settingsGroup);
 
             // 1. Chart Area
             const chartFrame = new Gtk.Frame({
@@ -88,10 +97,15 @@ export const AnalyzeParametersDialog = GObject.registerClass(
             mainBox.append(this.eventsContainer);
 
             clamp.set_child(mainBox);
-            scroll.set_child(clamp);
-            toolbarView.set_content(scroll);
 
-            this.set_content(toolbarView);
+            const scroll = new Gtk.ScrolledWindow({
+                hscrollbar_policy: Gtk.PolicyType.NEVER,
+                vscrollbar_policy: Gtk.PolicyType.AUTOMATIC,
+            });
+            scroll.set_child(clamp);
+
+            toolbarView.set_content(scroll);
+            this.set_child(toolbarView);
 
             this._refreshData();
         }

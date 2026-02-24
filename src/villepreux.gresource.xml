@@ -10,6 +10,8 @@
     <file>views/LogParameterDialog.js</file>
     <file>views/LivestockView.js</file>
     <file>views/TaskView.js</file>
+    <file>views/LogTaskActivityDialog.js</file>
+    <file>views/CreateTaskTemplateDialog.js</file>
     <file>views/GlobalDashboardView.js</file>
     <file>widgets/ChartWidget.js</file>
     <file>views/AnalyzeParametersDialog.js</file>

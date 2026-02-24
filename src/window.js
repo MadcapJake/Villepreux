@@ -62,7 +62,7 @@ export const VillepreuxWindow = GObject.registerClass(
                 dialog.connect('tank-added', () => {
                     this._refreshTankList();
                 });
-                dialog.present();
+                dialog.present(this);
             });
             sidebarHeader.pack_end(addTankBtn);
 
@@ -144,7 +144,7 @@ export const VillepreuxWindow = GObject.registerClass(
                 dialog.connect('tank-added', () => {
                     this._refreshTankList();
                 });
-                dialog.present();
+                dialog.present(this);
             });
             return btn;
         }
@@ -331,7 +331,7 @@ export const VillepreuxWindow = GObject.registerClass(
                                 visibleChild._refreshGrid();
                             }
                         });
-                        dialog.present();
+                        dialog.present(this);
                     });
                 }
             } else if (visibleName === 'livestock') {
@@ -339,13 +339,21 @@ export const VillepreuxWindow = GObject.registerClass(
                     label: 'Add Inhabitant',
                     css_classes: ['suggested-action'],
                 });
-                // btn.connect('clicked', ...)
+                btn.connect('clicked', () => {
+                    if (visibleChild && typeof visibleChild.openAddLivestock === 'function') {
+                        visibleChild.openAddLivestock();
+                    }
+                });
             } else if (visibleName === 'tasks') {
                 btn = new Gtk.Button({
                     label: 'Add Task',
                     css_classes: ['suggested-action'],
                 });
-                // btn.connect('clicked', ...)
+                btn.connect('clicked', () => {
+                    if (visibleChild && typeof visibleChild.openCreateTaskDialog === 'function') {
+                        visibleChild.openCreateTaskDialog();
+                    }
+                });
             }
 
             if (btn) {

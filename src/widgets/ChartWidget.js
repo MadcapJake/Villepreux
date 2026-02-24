@@ -109,13 +109,25 @@ export const ChartWidget = GObject.registerClass(
         }
 
         _draw(cr, width, height) {
-            const margin = this.mode === 'mini' ? 10 : 30;
-            const w = width - margin * 2;
-            const h = height - margin * 2;
+            let ml = 10, mr = 10, mt = 10, mb = 10;
+            if (this.mode === 'detail') {
+                ml = 45;
+                mr = 20;
+                mt = 30;
+                mb = 30;
+            } else if (this.mode === 'analyze') {
+                ml = 20;
+                mr = 20;
+                mt = 20;
+                mb = 30;
+            }
+
+            const w = width - ml - mr;
+            const h = height - mt - mb;
 
             if (w <= 0 || h <= 0) return;
 
-            cr.translate(margin, margin);
+            cr.translate(ml, mt);
 
             this.renderedPoints = [];
             this.renderedEvents = [];
@@ -178,6 +190,37 @@ export const ChartWidget = GObject.registerClass(
                     cr.setSourceRGBA(0.2, 0.8, 0.2, 0.1);
                     cr.rectangle(0, pxMax, w, pxMin - pxMax);
                     cr.fill();
+
+                    if (this.mode === 'detail') {
+                        // Draw Y axis line
+                        cr.setSourceRGBA(0.5, 0.5, 0.5, 1.0);
+                        cr.setLineWidth(1.0);
+                        cr.moveTo(0, 0);
+                        cr.lineTo(0, h);
+                        cr.stroke();
+
+                        cr.setFontSize(10);
+                        // Draw unit near top left
+                        if (def.unit) {
+                            cr.moveTo(-40, -10);
+                            cr.showText(def.unit);
+                        }
+
+                        // Top and bottom Y axis marks
+                        cr.moveTo(-40, 10);
+                        cr.showText(yMaxVal.toFixed(1));
+
+                        cr.moveTo(-40, h);
+                        cr.showText(yMinVal.toFixed(1));
+
+                        // Ideal range labels
+                        cr.setSourceRGBA(0.2, 0.6, 0.2, 1.0);
+                        cr.moveTo(-40, pxMax + 4);
+                        cr.showText(def.max_value.toFixed(1));
+
+                        cr.moveTo(-40, pxMin + 4);
+                        cr.showText(def.min_value.toFixed(1));
+                    }
                 }
 
                 if (pts.length === 0) {
@@ -237,8 +280,8 @@ export const ChartWidget = GObject.registerClass(
                     const y = h - (py * h);
 
                     this.renderedPoints.push({
-                        x: x + margin,
-                        y: y + margin,
+                        x: x + ml,
+                        y: y + mt,
                         pt: pt,
                         def: def
                     });
@@ -272,7 +315,7 @@ export const ChartWidget = GObject.registerClass(
                         const x = w * px;
 
                         this.renderedEvents.push({
-                            x: x + margin,
+                            x: x + ml,
                             ev: ev
                         });
 
@@ -282,6 +325,28 @@ export const ChartWidget = GObject.registerClass(
                     }
                 });
                 cr.setDash([], 0);
+            }
+
+            // Draw X Axis for detail and analyze modes
+            if (this.mode === 'detail' || this.mode === 'analyze') {
+                cr.setSourceRGBA(0.5, 0.5, 0.5, 1.0);
+                cr.setLineWidth(1.0);
+                cr.moveTo(0, h);
+                cr.lineTo(w, h);
+                cr.stroke();
+
+                if (hasData) {
+                    cr.setFontSize(10);
+                    // Simplify datestring to MM/DD/YYYY or similar based on toISOString
+                    const minStr = minDate.toISOString().split('T')[0];
+                    const maxStr = maxDate.toISOString().split('T')[0];
+
+                    cr.moveTo(0, h + 15);
+                    cr.showText(minStr);
+
+                    cr.moveTo(w - 60, h + 15); // right align roughly
+                    cr.showText(maxStr);
+                }
             }
         }
     }

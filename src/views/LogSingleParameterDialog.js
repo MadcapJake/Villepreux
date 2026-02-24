@@ -11,14 +11,12 @@ export const LogSingleParameterDialog = GObject.registerClass(
             'parameter-logged': {},
         }
     },
-    class LogSingleParameterDialog extends Adw.Window {
+    class LogSingleParameterDialog extends Adw.Dialog {
         _init(parentWindow, tank, def) {
             super._init({
-                transient_for: parentWindow,
-                modal: true,
                 title: `Log ${def.name}`,
-                default_width: 400,
-                default_height: 300,
+                content_width: 400,
+                content_height: 300,
             });
 
             this.tank = tank;
@@ -29,26 +27,11 @@ export const LogSingleParameterDialog = GObject.registerClass(
         _setupUI() {
             const toolbarView = new Adw.ToolbarView();
             const headerBar = new Adw.HeaderBar({
+                title_widget: new Gtk.Label({ label: `Add ${this.def.name} Test Result`, css_classes: ['title'] }),
                 show_end_title_buttons: false,
                 show_start_title_buttons: false
             });
-
-            const cancelBtn = new Gtk.Button({ label: 'Cancel' });
-            cancelBtn.connect('clicked', () => this.close());
-            headerBar.pack_start(cancelBtn);
-
-            this._saveBtn = new Gtk.Button({
-                label: 'Save',
-                css_classes: ['suggested-action']
-            });
-            this._saveBtn.connect('clicked', () => this._onSave());
-            headerBar.pack_end(this._saveBtn);
-
             toolbarView.add_top_bar(headerBar);
-
-            const scroll = new Gtk.ScrolledWindow({
-                hscrollbar_policy: Gtk.PolicyType.NEVER,
-            });
 
             const clamp = new Adw.Clamp({
                 maximum_size: 400,
@@ -111,6 +94,8 @@ export const LogSingleParameterDialog = GObject.registerClass(
                 input_purpose: Gtk.InputPurpose.NUMBER,
             });
 
+
+
             const validateInputs = () => {
                 this._saveBtn.sensitive = !!(this._valueRow.text && this._valueRow.text.trim() !== '');
             };
@@ -131,10 +116,39 @@ export const LogSingleParameterDialog = GObject.registerClass(
             valueGroup.add(this._valueRow);
             mainBox.append(valueGroup);
 
+            // Action Box
+            const actionBox = new Gtk.Box({
+                orientation: Gtk.Orientation.HORIZONTAL,
+                spacing: 12,
+                halign: Gtk.Align.END,
+                margin_top: 24,
+            });
+
+            const cancelBtn = new Gtk.Button({ label: 'Cancel' });
+            cancelBtn.connect('clicked', () => this.close());
+
+            this._saveBtn = new Gtk.Button({
+                label: 'Save',
+                css_classes: ['suggested-action']
+            });
+            this._saveBtn.connect('clicked', () => this._onSave());
+
+            actionBox.append(cancelBtn);
+            actionBox.append(this._saveBtn);
+            mainBox.append(actionBox);
+
+            validateInputs();
+
             clamp.set_child(mainBox);
+
+            const scroll = new Gtk.ScrolledWindow({
+                hscrollbar_policy: Gtk.PolicyType.NEVER,
+                vscrollbar_policy: Gtk.PolicyType.AUTOMATIC,
+            });
             scroll.set_child(clamp);
+
             toolbarView.set_content(scroll);
-            this.set_content(toolbarView);
+            this.set_child(toolbarView);
         }
 
         _onSave() {

@@ -184,6 +184,22 @@ export const LivestockView = GObject.registerClass(
             return button;
         }
 
+        openAddLivestock() {
+            this._navigateToDetail({
+                tank_id: this.tank.id,
+                name: '',
+                scientific_name: '',
+                type: '',
+                introduced_date: '',
+                quantity: 1,
+                source: '',
+                purchase_date: '',
+                cost: 0,
+                notes: '',
+                status: 'Alive'
+            });
+        }
+
         _navigateToDetail(item) {
             const isNew = !item.id;
             const detailPage = new Adw.NavigationPage({
