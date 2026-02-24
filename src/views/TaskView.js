@@ -132,6 +132,86 @@ export const TaskView = GObject.registerClass(
                 });
                 performBtn.connect('clicked', () => this._handleAction(t, 'Performed'));
 
+                // Notification Bell
+                const bellIconName = t.notification_time ? 'bell-outline-symbolic' : 'bell-outline-none-symbolic';
+                const bellBtn = new Gtk.MenuButton({
+                    icon_name: bellIconName,
+                    css_classes: ['circular', 'flat'],
+                    valign: Gtk.Align.CENTER,
+                    margin_start: 6,
+                    tooltip_text: 'Task Notification',
+                });
+
+                // Setup Popover for Bell
+                const bellPopover = new Gtk.Popover();
+                const bellPopoverBox = new Gtk.Box({
+                    orientation: Gtk.Orientation.VERTICAL,
+                    spacing: 12,
+                    margin_top: 12,
+                    margin_bottom: 12,
+                    margin_start: 12,
+                    margin_end: 12,
+                });
+
+                const timeGroup = new Adw.PreferencesGroup({ title: 'Notification Time' });
+
+                // Parse existing time
+                let hr = 9;
+                let mn = 0;
+                if (t.notification_time) {
+                    const parts = t.notification_time.split(':');
+                    if (parts.length === 2) {
+                        hr = parseInt(parts[0], 10);
+                        mn = parseInt(parts[1], 10);
+                    }
+                }
+
+                // Time selector row
+                const timeRow = new Adw.ActionRow({ title: 'Time' });
+                const timeBox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6 });
+
+                const hourAdj = new Gtk.Adjustment({ lower: 0, upper: 23, step_increment: 1, value: hr });
+                const hourSpin = new Gtk.SpinButton({ adjustment: hourAdj, numeric: true, orientation: Gtk.Orientation.VERTICAL });
+                const colonLbl = new Gtk.Label({ label: ':' });
+                const minAdj = new Gtk.Adjustment({ lower: 0, upper: 59, step_increment: 1, value: mn });
+                const minSpin = new Gtk.SpinButton({ adjustment: minAdj, numeric: true, orientation: Gtk.Orientation.VERTICAL });
+
+                timeBox.append(hourSpin);
+                timeBox.append(colonLbl);
+                timeBox.append(minSpin);
+                timeRow.add_suffix(timeBox);
+                timeGroup.add(timeRow);
+
+                bellPopoverBox.append(timeGroup);
+
+                // Save/Off buttons
+                const btnBox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6, homogeneous: true });
+                const saveBtn = new Gtk.Button({ label: 'Save', css_classes: ['suggested-action'] });
+                const offBtn = new Gtk.Button({ label: 'Off', css_classes: ['destructive-action'] });
+
+                saveBtn.connect('clicked', () => {
+                    const hStr = Math.floor(hourAdj.value).toString().padStart(2, '0');
+                    const mStr = Math.floor(minAdj.value).toString().padStart(2, '0');
+                    const updatedTask = { ...t, notification_time: `${hStr}:${mStr}` };
+                    DB.upsertTaskTemplate(updatedTask);
+                    bellPopover.popdown();
+                    this.refreshData();
+                });
+
+                offBtn.connect('clicked', () => {
+                    const updatedTask = { ...t, notification_time: null };
+                    DB.upsertTaskTemplate(updatedTask);
+                    bellPopover.popdown();
+                    this.refreshData();
+                });
+
+                btnBox.append(offBtn);
+                btnBox.append(saveBtn);
+                bellPopoverBox.append(btnBox);
+
+                bellPopover.set_child(bellPopoverBox);
+                bellBtn.set_popover(bellPopover);
+
                 const skipBtn = new Gtk.Button({
                     icon_name: 'media-skip-forward-symbolic',
                     css_classes: ['circular', 'destructive-action'],
@@ -143,6 +223,7 @@ export const TaskView = GObject.registerClass(
 
                 row.add_action(performBtn);
                 row.add_action(skipBtn);
+                row.add_action(bellBtn);
 
                 // Expanded content (instructions, historical config, edit/delete)
                 if (t.instructions) {

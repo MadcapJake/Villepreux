@@ -97,11 +97,12 @@ export const LogSingleParameterDialog = GObject.registerClass(
 
 
             const validateInputs = () => {
-                this._saveBtn.sensitive = !!(this._valueRow.text && this._valueRow.text.trim() !== '');
+                if (this._saveBtn) {
+                    this._saveBtn.sensitive = !!(this._valueRow.text && this._valueRow.text.trim() !== '');
+                }
             };
 
             this._valueRow.connect('notify::text', () => validateInputs());
-            validateInputs();
 
             if (this.def.unit) {
                 const unitLabel = new Gtk.Label({

@@ -116,6 +116,7 @@ function _createTables() {
             schedule_type TEXT,
             interval_value INTEGER,
             next_due_date TEXT,
+            notification_time TEXT,
             status TEXT DEFAULT 'Active',
             FOREIGN KEY(tank_id) REFERENCES tanks(id)
         )`,
@@ -136,6 +137,13 @@ function _createTables() {
             console.error('Error creating table:', e);
         }
     });
+
+    // Migrate existing tables
+    try {
+        _connection.execute_non_select_command(`ALTER TABLE task_templates ADD COLUMN notification_time TEXT`);
+    } catch (e) {
+        // Ignore duplicate column errors if it already exists
+    }
 }
 
 export function createTank(tankData) {
@@ -426,7 +434,7 @@ export function getTasksByDate(dateStr) {
     if (!_connection) return { due: [], activities: [] };
     try {
         const dueSql = `
-            SELECT t.id, tk.id as tank_id, tk.name as tank_name, t.title, t.next_due_date, t.category
+            SELECT t.id, tk.id as tank_id, tk.name as tank_name, t.title, t.next_due_date, t.notification_time, t.category
             FROM task_templates t
             JOIN tanks tk ON t.tank_id = tk.id
             WHERE t.next_due_date LIKE '${dateStr}%' AND t.status != 'Archived'
@@ -440,7 +448,9 @@ export function getTasksByDate(dateStr) {
                 tank_id: dm.get_value_at(1, i),
                 tank_name: dm.get_value_at(2, i),
                 title: dm.get_value_at(3, i),
-                category: dm.get_value_at(5, i)
+                next_due_date: dm.get_value_at(4, i),
+                notification_time: dm.get_value_at(5, i),
+                category: dm.get_value_at(6, i)
             });
         }
 
@@ -562,7 +572,7 @@ export function getEventsInRange(tankId, startDate) {
 export function getTaskTemplates(tankId) {
     if (!_connection) return [];
     try {
-        const sql = `SELECT * FROM task_templates WHERE tank_id = ${tankId} AND status = 'Active' ORDER BY category ASC, next_due_date ASC`;
+        const sql = `SELECT id, tank_id, equipment_id, category, title, instructions, schedule_type, interval_value, next_due_date, notification_time, status FROM task_templates WHERE tank_id = ${tankId} AND status = 'Active' ORDER BY category ASC, next_due_date ASC`;
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
         const results = [];
@@ -577,7 +587,8 @@ export function getTaskTemplates(tankId) {
                 schedule_type: dm.get_value_at(6, i),
                 interval_value: dm.get_value_at(7, i),
                 next_due_date: dm.get_value_at(8, i),
-                status: dm.get_value_at(9, i)
+                notification_time: dm.get_value_at(9, i),
+                status: dm.get_value_at(10, i)
             });
         }
         return results;
@@ -590,7 +601,7 @@ export function getTaskTemplates(tankId) {
 export function getArchivedTaskTemplates(tankId) {
     if (!_connection) return [];
     try {
-        const sql = `SELECT * FROM task_templates WHERE tank_id = ${tankId} AND status = 'Archived' ORDER BY category ASC, next_due_date ASC`;
+        const sql = `SELECT id, tank_id, equipment_id, category, title, instructions, schedule_type, interval_value, next_due_date, notification_time, status FROM task_templates WHERE tank_id = ${tankId} AND status = 'Archived' ORDER BY category ASC, next_due_date ASC`;
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
         const results = [];
@@ -605,7 +616,8 @@ export function getArchivedTaskTemplates(tankId) {
                 schedule_type: dm.get_value_at(6, i),
                 interval_value: dm.get_value_at(7, i),
                 next_due_date: dm.get_value_at(8, i),
-                status: dm.get_value_at(9, i)
+                notification_time: dm.get_value_at(9, i),
+                status: dm.get_value_at(10, i)
             });
         }
         return results;
@@ -622,16 +634,18 @@ export function upsertTaskTemplate(task) {
         const ins = task.instructions ? task.instructions.replace(/'/g, "''") : '';
         const eqId = task.equipment_id || 'NULL';
         const intVal = task.interval_value || 'NULL';
+        const notifTime = task.notification_time ? `'${task.notification_time}'` : 'NULL';
         let sql;
 
         if (task.id) {
             sql = `UPDATE task_templates SET 
                 equipment_id=${eqId}, category='${task.category}', title='${title}', instructions='${ins}', 
-                schedule_type='${task.schedule_type}', interval_value=${intVal}, next_due_date='${task.next_due_date}' 
+                schedule_type='${task.schedule_type}', interval_value=${intVal}, next_due_date='${task.next_due_date}',
+                notification_time=${notifTime}
                 WHERE id=${task.id}`;
         } else {
-            sql = `INSERT INTO task_templates (tank_id, equipment_id, category, title, instructions, schedule_type, interval_value, next_due_date, status) 
-                   VALUES (${task.tank_id}, ${eqId}, '${task.category}', '${title}', '${ins}', '${task.schedule_type}', ${intVal}, '${task.next_due_date}', 'Active')`;
+            sql = `INSERT INTO task_templates (tank_id, equipment_id, category, title, instructions, schedule_type, interval_value, next_due_date, notification_time, status) 
+                   VALUES (${task.tank_id}, ${eqId}, '${task.category}', '${title}', '${ins}', '${task.schedule_type}', ${intVal}, '${task.next_due_date}', ${notifTime}, 'Active')`;
         }
         _connection.execute_non_select_command(sql);
     } catch (e) {

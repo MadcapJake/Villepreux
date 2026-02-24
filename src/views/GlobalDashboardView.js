@@ -163,7 +163,7 @@ export const GlobalDashboardView = GObject.registerClass(
                     const row = new Adw.ActionRow({
                         title: `${p.type}: ${p.value}${unit}`,
                         subtitle: `Tank: ${p.tank_name}`,
-                        icon_name: 'water-drop-symbolic',
+                        icon_name: 'thermometer-symbolic',
                         activatable: true,
                     });
                     row.connect('activated', () => {

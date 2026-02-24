@@ -7,6 +7,7 @@ import Gdk from 'gi://Gdk';
 
 import { VillepreuxWindow } from './window.js';
 import { initDatabase } from './database.js';
+import { notificationService } from './NotificationService.js';
 
 export const VillepreuxApp = GObject.registerClass(
     class VillepreuxApp extends Adw.Application {
@@ -37,6 +38,9 @@ export const VillepreuxApp = GObject.registerClass(
 
             // Initialize database
             initDatabase();
+
+            // Initialize background notification service
+            notificationService.init(this);
         }
     }
 );
