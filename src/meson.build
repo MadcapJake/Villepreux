@@ -3,6 +3,7 @@ project_sources = [
   'window.js',
   'database.js',
   'NotificationService.js',
+  'utils/image_handler.js',
   'views/AddTankDialog.js',
 ]
 

@@ -14,6 +14,11 @@ export function initDatabase() {
             GLib.mkdir_with_parents(dbDir, 0o755);
         }
 
+        const imageDir = GLib.build_filenamev([dbDir, 'images']);
+        if (!GLib.file_test(imageDir, GLib.FileTest.IS_DIR)) {
+            GLib.mkdir_with_parents(imageDir, 0o755);
+        }
+
         const dsn = `SQLite://DB_DIR=${dbDir};DB_NAME=aquarium`;
         // Gda 6.0 usage:
         // open_from_string (provider, connection_string, auth_string, options)
@@ -144,6 +149,12 @@ function _createTables() {
     } catch (e) {
         // Ignore duplicate column errors if it already exists
     }
+
+    try {
+        _connection.execute_non_select_command(`ALTER TABLE livestock ADD COLUMN image_path TEXT`);
+    } catch (e) {
+        // Ignore duplicate column errors if it already exists
+    }
 }
 
 export function createTank(tankData) {
@@ -244,7 +255,7 @@ export function deleteParameterDefinition(id) {
 export function getLivestock(tankId) {
     if (!_connection) return [];
     try {
-        const sql = `SELECT * FROM livestock WHERE tank_id = ${tankId} ORDER BY name ASC`;
+        const sql = `SELECT id, tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status FROM livestock WHERE tank_id = ${tankId} ORDER BY name ASC`;
         console.log(`[DB] getLivestock SQL: ${sql}`);
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();

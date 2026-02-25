@@ -6,6 +6,7 @@
     <file>database.js</file>
     <file>NotificationService.js</file>
     <file>utils/icons.js</file>
+    <file>utils/image_handler.js</file>
     <file>views/AddTankDialog.js</file>
     <file>views/DashboardView.js</file>
     <file>views/ParameterView.js</file>

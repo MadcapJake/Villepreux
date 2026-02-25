@@ -1,8 +1,13 @@
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
+import Gio from 'gi://Gio';
+import Gdk from 'gi://Gdk';
+import GdkPixbuf from 'gi://GdkPixbuf';
+import Pango from 'gi://Pango';
 
 import * as DB from '../database.js';
+import { ImageHandler } from '../utils/image_handler.js';
 
 export const LivestockView = GObject.registerClass(
     class LivestockView extends Adw.Bin {
@@ -11,6 +16,20 @@ export const LivestockView = GObject.registerClass(
             this.tank = tank;
 
             this._navView = new Adw.NavigationView();
+
+            // Load CSS for image border radius
+            const cssProvider = new Gtk.CssProvider();
+            cssProvider.load_from_string(`
+                .card-image-area {
+                    border-top-left-radius: 12px;
+                    border-top-right-radius: 12px;
+                }
+            `);
+            Gtk.StyleContext.add_provider_for_display(
+                Gdk.Display.get_default(),
+                cssProvider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            );
 
             // --- Root Page ---
             const rootPage = new Adw.NavigationPage({
@@ -38,11 +57,13 @@ export const LivestockView = GObject.registerClass(
             // Livestock Grid
             this._flowBox = new Gtk.FlowBox({
                 valign: Gtk.Align.START,
+                halign: Gtk.Align.FILL,
                 min_children_per_line: 1,
                 max_children_per_line: 10,
                 selection_mode: Gtk.SelectionMode.NONE,
                 column_spacing: 12,
                 row_spacing: 12,
+                homogeneous: true,
             });
 
             this._refreshGrid();
@@ -78,6 +99,9 @@ export const LivestockView = GObject.registerClass(
         _createFishCard(item) {
             const button = new Gtk.Button({
                 css_classes: ['card'],
+                width_request: 160,
+                height_request: 200,
+                hexpand: true,
             });
 
             const card = new Gtk.Box({
@@ -86,13 +110,30 @@ export const LivestockView = GObject.registerClass(
             });
 
             // Image Area
-            // Use a frame or placeholder if no image
-            const imageArea = new Gtk.DrawingArea({
-                height_request: 120,
-                width_request: 160,
-                css_classes: ['card-image-area'], // Custom CSS class needed?
-            });
-            // TODO: Load real image if item.image_path exists
+            let imageArea;
+            if (item.image_path && item.image_path !== 'Alive' && item.image_path !== 'Deceased') {
+                const fullPath = ImageHandler.getImagePath(item.image_path);
+                try {
+                    const pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(fullPath, 160, 120, false);
+                    const texture = Gdk.Texture.new_for_pixbuf(pixbuf);
+                    imageArea = Gtk.Picture.new_for_paintable(texture);
+                } catch (e) {
+                    imageArea = Gtk.Picture.new_for_filename(fullPath);
+                }
+                imageArea.set_content_fit(Gtk.ContentFit.COVER);
+                imageArea.can_shrink = true;
+                imageArea.hexpand = true;
+                imageArea.height_request = 120;
+                imageArea.css_classes = ['card-image-area'];
+            } else {
+                imageArea = new Gtk.Image({
+                    icon_name: 'image-missing-symbolic',
+                    pixel_size: 48,
+                    height_request: 120,
+                    hexpand: true,
+                    css_classes: ['card-image-area', 'dim-label'],
+                });
+            }
 
             // Content
             const contentBox = new Gtk.Box({
@@ -135,7 +176,8 @@ export const LivestockView = GObject.registerClass(
             const button = new Gtk.Button({
                 css_classes: ['card'],
                 height_request: 200,
-                width_request: 180,
+                width_request: 160,
+                hexpand: true,
             });
 
             const card = new Gtk.Box({
@@ -225,22 +267,9 @@ export const LivestockView = GObject.registerClass(
             });
 
             // --- Header / Image ---
-            // Placeholder for image upload
-            const imgBox = new Gtk.Box({
-                height_request: 200,
-                css_classes: ['card'], // style it like a card
-                halign: Gtk.Align.FILL,
-            });
-            const imgLabel = new Gtk.Label({
-                label: 'Tap to add photo',
-                halign: Gtk.Align.CENTER,
-                valign: Gtk.Align.CENTER,
-                hexpand: true,
-            });
-            imgBox.append(imgLabel);
-            mainBox.append(imgBox);
+            const edits = { ...item };
 
-            // --- Save Button ---
+            // --- Save Button (Setup Early for Callbacks) ---
             const saveBtn = new Gtk.Button({
                 label: 'Save',
                 valign: Gtk.Align.CENTER,
@@ -248,9 +277,117 @@ export const LivestockView = GObject.registerClass(
                 visible: false,
             });
 
-            const edits = { ...item };
-
             const onEdit = () => { saveBtn.visible = true; };
+
+            const imgBox = new Gtk.Overlay({
+                css_classes: ['card'],
+                halign: Gtk.Align.FILL,
+                height_request: 200,
+            });
+
+            const imgLabel = new Gtk.Label({
+                label: 'Tap to add photo',
+                halign: Gtk.Align.CENTER,
+                valign: Gtk.Align.CENTER,
+                hexpand: true,
+                height_request: 200,
+            });
+
+            const pic = Gtk.Picture.new();
+            pic.set_content_fit(Gtk.ContentFit.CONTAIN);
+            pic.can_shrink = true;
+            pic.hexpand = true;
+            pic.vexpand = true;
+            pic.height_request = 300;
+
+            const deleteBtn = new Gtk.Button({
+                icon_name: 'user-trash-symbolic',
+                css_classes: ['circular', 'osd'],
+                halign: Gtk.Align.END,
+                valign: Gtk.Align.START,
+                margin_top: 12,
+                margin_end: 12,
+            });
+
+            deleteBtn.connect('clicked', () => {
+                const dialog = new Adw.MessageDialog({
+                    heading: 'Delete Photo',
+                    body: `Are you sure you want to delete this photo from the '${edits.name || 'inhabitant'}'?`,
+                });
+                if (this.get_root()) {
+                    dialog.transient_for = this.get_root();
+                }
+
+                dialog.add_response('cancel', 'Cancel');
+                dialog.add_response('delete', 'Delete');
+                dialog.set_response_appearance('delete', Adw.ResponseAppearance.DESTRUCTIVE);
+
+                dialog.connect('response', (dlg, response) => {
+                    if (response === 'delete') {
+                        edits.image_path = '';
+                        refreshDetailImage();
+                        onEdit();
+                    }
+                });
+
+                dialog.present();
+            });
+
+            imgBox.set_child(pic);
+            imgBox.add_overlay(imgLabel);
+            imgBox.add_overlay(deleteBtn);
+
+            const refreshDetailImage = () => {
+                if (edits.image_path && edits.image_path !== 'Alive' && edits.image_path !== 'Deceased') {
+                    const fullPath = ImageHandler.getImagePath(edits.image_path);
+                    console.log(`[LivestockView] Detail View Refreshing Image: ${fullPath}`);
+                    pic.set_filename(fullPath);
+                    pic.visible = true;
+                    imgLabel.visible = false;
+                    deleteBtn.visible = true;
+                } else {
+                    pic.set_filename(null);
+                    pic.visible = false;
+                    imgLabel.visible = true;
+                    deleteBtn.visible = false;
+                }
+            };
+            refreshDetailImage();
+
+            // Set up click gesture for photo upload
+            const imgClick = new Gtk.GestureClick();
+            imgClick.connect('released', () => {
+                const dialog = new Gtk.FileDialog({ title: 'Select Inhabitant Photo' });
+                const filter = new Gtk.FileFilter();
+                filter.add_mime_type('image/jpeg');
+                filter.add_mime_type('image/png');
+                filter.add_mime_type('image/webp');
+
+                const filterList = Gio.ListStore.new(Gtk.FileFilter);
+                filterList.append(filter);
+                dialog.set_filters(filterList);
+
+                dialog.open(this.get_root(), null, (source, res) => {
+                    try {
+                        console.log('[LivestockView] FileDialog finished, importing synchronously...');
+                        const file = dialog.open_finish(res);
+                        const newFilename = ImageHandler.importImage(file);
+                        console.log(`[LivestockView] Image imported as: ${newFilename}`);
+                        edits.image_path = newFilename;
+                        console.log('[LivestockView] Refreshing Detail Image box...');
+                        refreshDetailImage();
+                        console.log('[LivestockView] Activating Save Button...');
+                        onEdit();
+                    } catch (e) {
+                        if (!e.matches(Gtk.DialogError, Gtk.DialogError.DISMISSED)) {
+                            console.error('[LivestockView] File open failed:', e);
+                        }
+                    }
+                });
+            });
+            imgBox.add_controller(imgClick);
+
+            mainBox.append(imgBox);
 
             saveBtn.connect('clicked', () => {
                 if (!edits.name) edits.name = 'Unnamed';
