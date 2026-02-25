@@ -19,6 +19,30 @@ project_resources = gnome.compile_resources(
 # Install source files
 install_data(project_sources, install_dir: moduledir)
 
+# Install scalable symbolic icon
+install_data(
+  'icons/scalable/apps/villepreux-symbolic.svg',
+  install_dir: join_paths(get_option('datadir'), 'icons/hicolor/scalable/apps'),
+  rename: 'com.github.madcapjake.Villepreux-symbolic.svg'
+)
+
+# Install notification category icons for GNOME Shell (needs AppID prefix to escape sandbox)
+notification_icons = [
+  'wrench-wide-symbolic.svg',
+  'drinking-fountain-symbolic.svg',
+  'pharmacy-symbolic.svg',
+  'restaurant-symbolic.svg',
+  'seal-symbolic.svg'
+]
+
+foreach icon_name : notification_icons
+  install_data(
+    join_paths('icons/scalable/actions', icon_name),
+    install_dir: join_paths(get_option('datadir'), 'icons/hicolor/scalable/actions'),
+    rename: 'com.github.madcapjake.Villepreux-' + icon_name
+  )
+endforeach
+
 # Create the executable script
 conf = configuration_data()
 conf.set('GJS', find_program('gjs').full_path())

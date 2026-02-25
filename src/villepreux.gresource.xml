@@ -21,6 +21,7 @@
     <file>views/AnalyzeParametersDialog.js</file>
     <file>views/LogSingleParameterDialog.js</file>
     <file>views/PastActivitiesDialog.js</file>
+    <file preprocess="xml-stripblanks">icons/scalable/apps/villepreux-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/fish-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/thermometer-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/running-symbolic.svg</file>

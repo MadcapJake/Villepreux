@@ -1,6 +1,7 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import * as DB from './database.js';
+import { getTaskCategoryIcon } from './utils/icons.js';
 
 class NotificationService {
     constructor() {
@@ -70,6 +71,10 @@ class NotificationService {
         const notification = new Gio.Notification();
         notification.set_title(`Task Due: ${task.title}`);
         notification.set_body(`Tank: ${task.tank_name}`);
+
+        const iconName = getTaskCategoryIcon(task.category);
+        const icon = Gio.ThemedIcon.new(`com.github.madcapjake.Villepreux-${iconName}`);
+        notification.set_icon(icon);
 
         // Pass the task ID as string parameter to the actions
         const taskIdStr = String(task.id);
