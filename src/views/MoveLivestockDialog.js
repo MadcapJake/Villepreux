@@ -17,6 +17,7 @@ export const MoveLivestockDialog = GObject.registerClass(
                 content_height: 400,
             });
 
+            this._parentWindow = parent;
             this.livestock = livestock;
             this._setupUI();
         }
@@ -90,6 +91,19 @@ export const MoveLivestockDialog = GObject.registerClass(
             quantityRow.add_suffix(this.quantitySpin);
             quantityGroup.add(quantityRow);
             mainBox.append(quantityGroup);
+
+            const warningLabel = new Gtk.Label({
+                label: 'Moving only a partial quantity of this livestock will not carry the livestock updates over to the new tank',
+                wrap: true,
+                halign: Gtk.Align.START,
+                css_classes: ['error', 'dim-label'],
+                visible: false,
+            });
+            mainBox.append(warningLabel);
+
+            this.quantitySpin.connect('notify::value', () => {
+                warningLabel.visible = this.quantitySpin.get_value_as_int() < this.maxQuantity;
+            });
 
             // Tanks List
             const tanksGroup = new Adw.PreferencesGroup({
@@ -168,17 +182,17 @@ export const MoveLivestockDialog = GObject.registerClass(
                         DB.upsertLivestock(newLivestock);
 
                         // Notify user that timeline doesn't move
-                        if (parent && typeof parent.addToast === 'function') {
+                        if (this._parentWindow && typeof this._parentWindow.addToast === 'function') {
                             const toast = new Adw.Toast({
                                 title: "Partial move completed. Timeline updates were not moved to the new tank.",
                                 timeout: 4 // seconds
                             });
-                            parent.addToast(toast);
+                            this._parentWindow.addToast(toast);
                         } else {
                             const toast = new Adw.Toast({
                                 title: "Partial move completed. Timeline updates were not moved to the new tank.",
                             });
-                            const mainWindow = parent.get_root();
+                            const mainWindow = this.get_root();
                             if (mainWindow && typeof mainWindow.addToast === 'function') {
                                 mainWindow.addToast(toast);
                             }
