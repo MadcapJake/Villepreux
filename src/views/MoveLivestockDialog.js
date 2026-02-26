@@ -65,6 +65,32 @@ export const MoveLivestockDialog = GObject.registerClass(
             });
             mainBox.append(noteLabel);
 
+            // Quantity Selection
+            const quantityGroup = new Adw.PreferencesGroup({
+                title: 'Quantity to Move',
+            });
+
+            this.maxQuantity = this.livestock.quantity || 1;
+
+            const quantityRow = new Adw.ActionRow({
+                title: 'Amount',
+                subtitle: `Available: ${this.maxQuantity}`,
+            });
+
+            this.quantitySpin = new Gtk.SpinButton({
+                adjustment: new Gtk.Adjustment({
+                    lower: 1,
+                    upper: this.maxQuantity,
+                    step_increment: 1,
+                    value: this.maxQuantity,
+                }),
+                valign: Gtk.Align.CENTER,
+            });
+
+            quantityRow.add_suffix(this.quantitySpin);
+            quantityGroup.add(quantityRow);
+            mainBox.append(quantityGroup);
+
             // Tanks List
             const tanksGroup = new Adw.PreferencesGroup({
                 title: 'Select Destination Tank',
@@ -126,15 +152,49 @@ export const MoveLivestockDialog = GObject.registerClass(
             // Action Connection
             moveBtn.connect('clicked', () => {
                 if (selectedTank) {
-                    this.livestock.tank_id = selectedTank.id;
-                    DB.upsertLivestock(this.livestock);
+                    const moveQuantity = this.quantitySpin.get_value_as_int();
 
-                    // Log the move in the timeline
-                    DB.insertLivestockUpdate({
-                        livestock_id: this.livestock.id,
-                        log_date: new Date().toISOString().split('T')[0],
-                        note: `Moved to tank: ${selectedTank.name}`
-                    });
+                    if (moveQuantity < this.maxQuantity) {
+                        // Partial Move - Create a copy for the destination tank
+                        // Update current tank's quantity
+                        this.livestock.quantity = this.maxQuantity - moveQuantity;
+                        DB.upsertLivestock(this.livestock);
+
+                        // Create new record for destination tank
+                        const newLivestock = { ...this.livestock };
+                        delete newLivestock.id; // DB will auto-increment
+                        newLivestock.tank_id = selectedTank.id;
+                        newLivestock.quantity = moveQuantity;
+                        DB.upsertLivestock(newLivestock);
+
+                        // Notify user that timeline doesn't move
+                        if (parent && typeof parent.addToast === 'function') {
+                            const toast = new Adw.Toast({
+                                title: "Partial move completed. Timeline updates were not moved to the new tank.",
+                                timeout: 4 // seconds
+                            });
+                            parent.addToast(toast);
+                        } else {
+                            const toast = new Adw.Toast({
+                                title: "Partial move completed. Timeline updates were not moved to the new tank.",
+                            });
+                            const mainWindow = parent.get_root();
+                            if (mainWindow && typeof mainWindow.addToast === 'function') {
+                                mainWindow.addToast(toast);
+                            }
+                        }
+                    } else {
+                        // Full Move
+                        this.livestock.tank_id = selectedTank.id;
+                        DB.upsertLivestock(this.livestock);
+
+                        // Log the move in the timeline
+                        DB.insertLivestockUpdate({
+                            livestock_id: this.livestock.id,
+                            log_date: new Date().toISOString().split('T')[0],
+                            note: `Moved to tank: ${selectedTank.name}`
+                        });
+                    }
 
                     this.emit('livestock-moved');
                     this.close();

@@ -584,7 +584,7 @@ export function getTasksByDate(dateStr) {
 }
 
 export function getLivestockEventsByDate(dateStr) {
-    if (!_connection) return { purchased: [], introduced: [] };
+    if (!_connection) return { purchased: [], introduced: [], updates: [] };
     try {
         const sql = `
             SELECT l.id, t.name as tank_name, l.name, l.purchase_date, l.introduced_date
@@ -607,10 +607,32 @@ export function getLivestockEventsByDate(dateStr) {
             if (purchaseStr.startsWith(dateStr)) purchased.push(item);
             if (intStr.startsWith(dateStr)) introduced.push(item);
         }
-        return { purchased, introduced };
+
+        const updatesSql = `
+            SELECT u.id, u.livestock_id, l.name as name, t.id as tank_id, t.name as tank_name, u.note
+            FROM livestock_updates u
+            JOIN livestock l ON u.livestock_id = l.id
+            JOIN tanks t ON l.tank_id = t.id
+            WHERE u.log_date LIKE '${dateStr}%'
+        `;
+        const uDm = _connection.execute_select_command(updatesSql);
+        const updatesNumRows = uDm.get_n_rows();
+        const updates = [];
+        for (let i = 0; i < updatesNumRows; i++) {
+            updates.push({
+                id: uDm.get_value_at(0, i),
+                livestock_id: uDm.get_value_at(1, i),
+                name: uDm.get_value_at(2, i),
+                tank_id: uDm.get_value_at(3, i),
+                tank_name: uDm.get_value_at(4, i),
+                note: uDm.get_value_at(5, i),
+            });
+        }
+
+        return { purchased, introduced, updates };
     } catch (e) {
         console.error('Failed to get livestock events by date:', e);
-        return { purchased: [], introduced: [] };
+        return { purchased: [], introduced: [], updates: [] };
     }
 }
 

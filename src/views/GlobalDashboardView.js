@@ -279,6 +279,49 @@ export const GlobalDashboardView = GObject.registerClass(
                 this._detailsBox.append(intGroup);
             }
 
+            if (livestockEvents.updates && livestockEvents.updates.length > 0) {
+                hasData = true;
+                const updGroup = new Adw.PreferencesGroup({ title: 'Livestock Updates' });
+                livestockEvents.updates.forEach(u => {
+                    const row = new Adw.ActionRow({
+                        title: u.name || 'Unnamed',
+                        subtitle: `Tank: ${u.tank_name}${u.note ? ' - ' + u.note : ''}`,
+                        subtitle_lines: 2,
+                        icon_name: 'rss-symbolic',
+                        activatable: true,
+                    });
+                    row.connect('activated', () => {
+                        const rootWindow = this.get_root();
+                        const tank = DB.getTanks().find(x => x.id === u.tank_id);
+                        if (tank && rootWindow && rootWindow._onTankSelected) {
+                            rootWindow._onTankSelected(tank);
+                            rootWindow._contentView.content.stack.set_visible_child_name('livestock');
+
+                            const dashboard = rootWindow._contentView.content;
+                            const livestockView = dashboard.stack.get_child_by_name('livestock');
+
+                            if (livestockView) {
+                                const allLivestock = DB.getLivestock(tank.id);
+                                const fullItem = allLivestock.find(l => l.id === u.livestock_id);
+
+                                if (fullItem) {
+                                    GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                                        try {
+                                            livestockView._navigateToDetail(fullItem);
+                                        } catch (e) {
+                                            console.error(`[GlobalDashboardView] Navigation failed: ${e}`);
+                                        }
+                                        return GLib.SOURCE_REMOVE;
+                                    });
+                                }
+                            }
+                        }
+                    });
+                    updGroup.add(row);
+                });
+                this._detailsBox.append(updGroup);
+            }
+
             if (!hasData) {
                 const group = new Adw.PreferencesGroup();
                 const emptyRow = new Adw.ActionRow({
