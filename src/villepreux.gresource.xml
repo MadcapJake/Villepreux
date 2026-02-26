@@ -44,5 +44,6 @@
     <file preprocess="xml-stripblanks">icons/scalable/mimetypes/seaweed-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/mimetypes/shrimp-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/mimetypes/turtle-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/skull-symbolic.svg</file>
   </gresource>
 </gresources>

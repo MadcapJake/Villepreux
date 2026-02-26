@@ -90,6 +90,9 @@ export const LivestockView = GObject.registerClass(
 
             const items = DB.getLivestock(this.tank.id);
 
+            const activeItems = items.filter(i => i.status === 'Alive');
+            const inactiveItems = items.filter(i => i.status !== 'Alive');
+
             const itemsByType = {
                 'Fish': [],
                 'Invertebrates': [],
@@ -98,7 +101,7 @@ export const LivestockView = GObject.registerClass(
                 'Amphibians & Reptiles': []
             };
 
-            items.forEach(item => {
+            activeItems.forEach(item => {
                 const t = item.type;
                 if (itemsByType[t] !== undefined) {
                     itemsByType[t].push(item);
@@ -160,6 +163,43 @@ export const LivestockView = GObject.registerClass(
                 group.add(flowBox);
                 this.mainBox.append(group);
             });
+
+            if (inactiveItems.length > 0) {
+                const inactiveGroup = new Adw.PreferencesGroup({
+                    margin_top: 24,
+                });
+
+                const inactiveExpander = new Adw.ExpanderRow({
+                    title: 'Deceased / Rehomed',
+                    icon_name: 'skull-symbolic',
+                });
+
+                inactiveGroup.add(inactiveExpander);
+
+                const inactiveFlowBox = new Gtk.FlowBox({
+                    valign: Gtk.Align.START,
+                    halign: Gtk.Align.FILL,
+                    min_children_per_line: 1,
+                    max_children_per_line: 6,
+                    selection_mode: Gtk.SelectionMode.NONE,
+                    column_spacing: 12,
+                    row_spacing: 12,
+                    homogeneous: true,
+                    margin_top: 12,
+                    margin_bottom: 12,
+                    margin_start: 12,
+                    margin_end: 12,
+                });
+
+                this.flowBoxes.push(inactiveFlowBox);
+
+                inactiveItems.forEach(item => {
+                    inactiveFlowBox.append(this._createFishCard(item));
+                });
+
+                inactiveExpander.add_row(inactiveFlowBox);
+                this.mainBox.append(inactiveGroup);
+            }
         }
 
         _createFishCard(item) {
