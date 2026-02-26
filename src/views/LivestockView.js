@@ -126,9 +126,8 @@ export const LivestockView = GObject.registerClass(
                 const typeItems = itemsByType[typeId];
                 if (!typeItems || typeItems.length === 0) return;
 
-                // For 'Other', if we have dynamically added custom categories?
-                // we treat them as 'Other' in terms of visual fallback, but display 'Other'
-                const displayTitle = typeId.replace(/&/g, '&amp;');
+
+                let displayTitle = typeId.replace(/&/g, '&amp;');
 
                 const group = new Adw.PreferencesGroup({
                     title: displayTitle,
@@ -267,6 +266,7 @@ export const LivestockView = GObject.registerClass(
                 label: item.scientific_name || item.type || 'Unknown Species',
                 css_classes: ['caption', 'dim-label'],
                 halign: Gtk.Align.START,
+                use_markup: false
             });
 
             contentBox.append(nameLabel);
@@ -364,6 +364,7 @@ export const LivestockView = GObject.registerClass(
                 label: item.scientific_name || item.type || 'Unknown Species',
                 css_classes: ['dim-label'],
                 halign: Gtk.Align.CENTER,
+                use_markup: false
             });
 
             headerBox.append(heroImg);
@@ -419,6 +420,15 @@ export const LivestockView = GObject.registerClass(
                     dialog.connect('response', (dlg, response) => {
                         if (response === 'deceased' || response === 'rehomed') {
                             item.status = response === 'deceased' ? 'Deceased' : 'Rehomed';
+
+                            // Log the timeline update
+                            const actionStr = response === 'deceased' ? 'deceased' : 'rehomed';
+                            DB.insertLivestockUpdate({
+                                livestock_id: item.id,
+                                log_date: new Date().toISOString().split('T')[0],
+                                note: `Livestock was marked as ${actionStr}.`
+                            });
+
                             DB.upsertLivestock(item);
                             this._refreshGrid();
                             this._navView.pop();
@@ -813,7 +823,8 @@ export const LivestockView = GObject.registerClass(
                 'Plants & Macroalgae',
                 'Amphibians & Reptiles'
             ];
-            const typeModel = Gtk.StringList.new(typeOptions);
+            const escapedOptions = typeOptions.map(t => t.replace(/&/g, '&amp;'));
+            const typeModel = Gtk.StringList.new(escapedOptions);
             const typeRow = new Adw.ComboRow({
                 title: 'Type',
                 model: typeModel,
@@ -833,7 +844,7 @@ export const LivestockView = GObject.registerClass(
             typeRow.connect('notify::selected-item', () => {
                 const selectedItem = typeRow.selected_item;
                 if (selectedItem) {
-                    edits.type = selectedItem.get_string();
+                    edits.type = selectedItem.get_string().replace(/&amp;/g, '&');
                     onEdit();
                 }
             });
