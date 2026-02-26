@@ -398,6 +398,19 @@ export const ParameterView = GObject.registerClass(
                 // Validate (?)
                 if (!edits.name) return;
 
+                // Validation: Prevent duplicate parameter name for the same tank
+                const existingParams = DB.getParameterDefinitions(this.tank.id);
+                const isDuplicate = existingParams.some(p =>
+                    p.name.trim().toLowerCase() === edits.name.trim().toLowerCase() &&
+                    p.id !== edits.id
+                );
+
+                if (isDuplicate) {
+                    const toast = new Adw.Toast({ title: `A parameter named "${edits.name.trim()}" already exists.` });
+                    this.get_root().addToast(toast);
+                    return;
+                }
+
                 // Save to DB
                 try {
                     DB.upsertParameterDefinition(edits);
