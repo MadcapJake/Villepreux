@@ -2,11 +2,13 @@ import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
 
-import { AddTankDialog } from './views/AddTankDialog.js';
+import { EditTankDialog } from './views/EditTankDialog.js';
 import { DashboardView } from './views/DashboardView.js';
 import { GlobalDashboardView } from './views/GlobalDashboardView.js';
 import { LogParameterDialog } from './views/LogParameterDialog.js';
-import { getTanks } from './database.js';
+import { ThemeDialog, DateTimeFormatDialog } from './views/SettingsDialogs.js';
+import { DuplicateTankDialog } from './views/DuplicateTankDialog.js';
+import { getTanks, getSetting, setSetting, resetDatabase, deleteTank } from './database.js';
 
 export const VillepreuxWindow = GObject.registerClass(
     class VillepreuxWindow extends Adw.ApplicationWindow {
@@ -60,8 +62,8 @@ export const VillepreuxWindow = GObject.registerClass(
                 css_classes: ['flat']
             });
             addTankBtn.connect('clicked', () => {
-                const dialog = new AddTankDialog(this);
-                dialog.connect('tank-added', () => {
+                const dialog = new EditTankDialog(this);
+                dialog.connect('tank-saved', () => {
                     this._refreshTankList();
                 });
                 dialog.present(this);
@@ -143,8 +145,8 @@ export const VillepreuxWindow = GObject.registerClass(
                 halign: Gtk.Align.CENTER,
             });
             btn.connect('clicked', () => {
-                const dialog = new AddTankDialog(this);
-                dialog.connect('tank-added', () => {
+                const dialog = new EditTankDialog(this);
+                dialog.connect('tank-saved', () => {
                     this._refreshTankList();
                 });
                 dialog.present(this);
@@ -194,6 +196,7 @@ export const VillepreuxWindow = GObject.registerClass(
                         this._updateHeaderButtons(null);
                     }
                     this.set_title('Villepreux');
+                    this._contentHeader.set_title_widget(null);
                     this._contentView.set_content(this._statusPage);
                 }
             }
@@ -204,6 +207,70 @@ export const VillepreuxWindow = GObject.registerClass(
             const dashboard = new GlobalDashboardView();
 
             this.set_title('Villepreux');
+
+            // Custom Title Widget Menu
+            const titleButton = new Gtk.MenuButton({
+                css_classes: ['flat'],
+            });
+            const btnContent = new Adw.ButtonContent({
+                label: 'Villepreux',
+                icon_name: 'pan-down-symbolic',
+            });
+            titleButton.set_child(btnContent);
+
+            const popover = new Gtk.Popover();
+            popover.add_css_class('menu');
+            const popBox = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, margin_top: 6, margin_bottom: 6 });
+
+            const createMenuBtn = (label, actionCb, isDestructive = false) => {
+                const btn = new Gtk.Button({ css_classes: ['flat'], halign: Gtk.Align.FILL });
+                const lbl = new Gtk.Label({ label: label, halign: Gtk.Align.START, margin_start: 12, margin_end: 12, margin_top: 6, margin_bottom: 6 });
+                btn.set_child(lbl);
+                if (isDestructive) {
+                    btn.add_css_class('error');
+                    lbl.add_css_class('error');
+                }
+                btn.connect('clicked', () => {
+                    popover.popdown();
+                    actionCb();
+                });
+                return btn;
+            };
+
+            popBox.append(createMenuBtn('Date & Time Format', () => {
+                const dfDialog = new DateTimeFormatDialog(this);
+                dfDialog.present(this);
+            }));
+
+            popBox.append(createMenuBtn('Theme', () => {
+                const thDialog = new ThemeDialog(this);
+                thDialog.present(this);
+            }));
+
+            popBox.append(new Gtk.Separator({ margin_top: 6, margin_bottom: 6 }));
+
+            popBox.append(createMenuBtn('Reset Database', () => {
+                const dialog = new Adw.MessageDialog({
+                    heading: 'Reset Database',
+                    body: 'Are you sure you want to delete all data?',
+                });
+                dialog.add_response('cancel', 'Cancel');
+                dialog.add_response('reset', 'Reset');
+                dialog.set_response_appearance('reset', Adw.ResponseAppearance.DESTRUCTIVE);
+                dialog.connect('response', (_, response) => {
+                    if (response === 'reset') {
+                        resetDatabase();
+                        this._refreshTankList();
+                    }
+                });
+                dialog.present(this);
+            }, true));
+
+            popover.set_child(popBox);
+            titleButton.set_popover(popover);
+
+            this._contentHeader.set_title_widget(titleButton);
+
             this._contentView.set_content(dashboard);
 
             // Remove view switcher if present
@@ -234,6 +301,74 @@ export const VillepreuxWindow = GObject.registerClass(
             this._currentTank = tank;
 
             this.set_title(tank.name);
+
+            const titleButton = new Gtk.MenuButton({
+                css_classes: ['flat'],
+            });
+            const btnContent = new Adw.ButtonContent({
+                label: tank.name,
+                icon_name: 'pan-down-symbolic',
+            });
+            titleButton.set_child(btnContent);
+
+            const popover = new Gtk.Popover();
+            popover.add_css_class('menu');
+            const popBox = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, margin_top: 6, margin_bottom: 6 });
+
+            const createMenuBtn = (label, actionCb, isDestructive = false) => {
+                const btn = new Gtk.Button({ css_classes: ['flat'], halign: Gtk.Align.FILL });
+                const lbl = new Gtk.Label({ label: label, halign: Gtk.Align.START, margin_start: 12, margin_end: 12, margin_top: 6, margin_bottom: 6 });
+                btn.set_child(lbl);
+                if (isDestructive) {
+                    btn.add_css_class('error');
+                    lbl.add_css_class('error');
+                }
+                btn.connect('clicked', () => {
+                    popover.popdown();
+                    actionCb();
+                });
+                return btn;
+            };
+
+            popBox.append(createMenuBtn('Edit Tank', () => {
+                const editDialog = new EditTankDialog(this, tank);
+                editDialog.connect('tank-saved', () => {
+                    this._refreshTankList();
+                });
+                editDialog.present(this);
+            }));
+
+            popBox.append(createMenuBtn('Duplicate Tank', () => {
+                const dupDialog = new DuplicateTankDialog(this, tank);
+                dupDialog.connect('tank-duplicated', () => {
+                    this._refreshTankList();
+                });
+                dupDialog.present(this);
+            }));
+
+            popBox.append(new Gtk.Separator({ margin_top: 6, margin_bottom: 6 }));
+
+            popBox.append(createMenuBtn('Delete Tank', () => {
+                const dialog = new Adw.MessageDialog({
+                    heading: 'Delete Tank',
+                    body: 'Are you sure you want all the associated parameters, livestock, livestock updates, tasks, and task activities to be deleted?',
+                });
+                dialog.add_response('cancel', 'Cancel');
+                dialog.add_response('delete', 'Delete');
+                dialog.set_response_appearance('delete', Adw.ResponseAppearance.DESTRUCTIVE);
+                dialog.connect('response', (_, response) => {
+                    if (response === 'delete') {
+                        deleteTank(tank.id);
+                        this._refreshTankList();
+                    }
+                });
+                dialog.present(this);
+            }, true));
+
+            popover.set_child(popBox);
+            titleButton.set_popover(popover);
+
+            this._contentHeader.set_title_widget(titleButton);
 
             // Remember current tab if we are already showing a dashboard
             let currentTab = null;

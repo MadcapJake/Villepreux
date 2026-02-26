@@ -7,7 +7,10 @@
     <file>NotificationService.js</file>
     <file>utils/icons.js</file>
     <file>utils/image_handler.js</file>
-    <file>views/AddTankDialog.js</file>
+    <file>utils/date_formatter.js</file>
+    <file>views/EditTankDialog.js</file>
+    <file>views/DuplicateTankDialog.js</file>
+    <file>views/SettingsDialogs.js</file>
     <file>views/DashboardView.js</file>
     <file>views/ParameterView.js</file>
     <file>views/LogParameterDialog.js</file>

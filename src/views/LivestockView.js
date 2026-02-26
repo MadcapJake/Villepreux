@@ -8,6 +8,7 @@ import Pango from 'gi://Pango';
 
 import * as DB from '../database.js';
 import { ImageHandler } from '../utils/image_handler.js';
+import { formatUIDate } from '../utils/date_formatter.js';
 import { getLivestockCategoryIcon } from '../utils/icons.js';
 import { LivestockUpdateDialog } from './LivestockUpdateDialog.js';
 import { MoveLivestockDialog } from './MoveLivestockDialog.js';
@@ -471,13 +472,13 @@ export const LivestockView = GObject.registerClass(
                 title: 'Acquisition Details',
             });
 
-            const introRow = new Adw.ActionRow({ title: 'Introduced On', subtitle: item.introduced_date || 'Unknown' });
+            const introRow = new Adw.ActionRow({ title: 'Introduced On', subtitle: formatUIDate(item.introduced_date) || 'Unknown' });
             acquisitionRow.add_row(introRow);
 
             const sourceRow = new Adw.ActionRow({ title: 'Purchased From', subtitle: item.source || 'Unknown' });
             acquisitionRow.add_row(sourceRow);
 
-            const purchasedRow = new Adw.ActionRow({ title: 'Purchased On', subtitle: item.purchase_date || 'Unknown' });
+            const purchasedRow = new Adw.ActionRow({ title: 'Purchased On', subtitle: formatUIDate(item.purchase_date) || 'Unknown' });
             acquisitionRow.add_row(purchasedRow);
 
             const costRow = new Adw.ActionRow({ title: 'Cost', subtitle: `$${(item.cost || 0).toFixed(2)}` });
@@ -516,7 +517,7 @@ export const LivestockView = GObject.registerClass(
                 updates.forEach(upd => {
                     const noteText = upd.note ? upd.note.replace(/\n+/g, ' ') : 'No notes';
                     const row = new Adw.ActionRow({
-                        title: upd.log_date,
+                        title: formatUIDate(upd.log_date) || 'Unknown Date',
                         subtitle: noteText,
                         subtitle_lines: 2,
                         activatable: true,

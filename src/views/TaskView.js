@@ -7,6 +7,7 @@ import { CreateTaskTemplateDialog } from './CreateTaskTemplateDialog.js';
 import { PastActivitiesDialog } from './PastActivitiesDialog.js';
 import { CopyTaskDialog } from './CopyTaskDialog.js';
 import { getTaskCategoryIcon } from '../utils/icons.js';
+import { formatUIDate, formatUITime } from '../utils/date_formatter.js';
 
 export const TaskView = GObject.registerClass(
     class TaskView extends Adw.PreferencesPage {
@@ -114,9 +115,13 @@ export const TaskView = GObject.registerClass(
                 }
 
                 // Create the row
+                let subtext = `Due: ${formatUIDate(t.next_due_date)}`;
+                if (t.notification_time) {
+                    subtext += ` at ${formatUITime(t.notification_time)}`;
+                }
                 const row = new Adw.ExpanderRow({
                     title: t.title,
-                    subtitle: `Due: ${t.next_due_date}`,
+                    subtitle: subtext,
                 });
 
                 if (new Date(t.next_due_date) < new Date()) {

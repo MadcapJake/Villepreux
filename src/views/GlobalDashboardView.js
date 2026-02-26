@@ -6,6 +6,7 @@ import GLib from 'gi://GLib';
 import * as DB from '../database.js';
 
 import { getTaskCategoryIcon } from '../utils/icons.js';
+import { formatUIDate, formatUITime } from '../utils/date_formatter.js';
 
 export const GlobalDashboardView = GObject.registerClass(
     class GlobalDashboardView extends Adw.Bin {
@@ -142,7 +143,7 @@ export const GlobalDashboardView = GObject.registerClass(
 
             // --- Title ---
             const title = new Gtk.Label({
-                label: `Events for ${dateStr}`,
+                label: `Events for ${formatUIDate(dateStr)}`,
                 css_classes: ['title-3'],
                 halign: Gtk.Align.START,
                 margin_bottom: 12,

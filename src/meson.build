@@ -4,7 +4,10 @@ project_sources = [
   'database.js',
   'NotificationService.js',
   'utils/image_handler.js',
-  'views/AddTankDialog.js',
+  'views/EditTankDialog.js',
+  'views/DuplicateTankDialog.js',
+  'views/LivestockUpdateDialog.js',
+  'views/MoveLivestockDialog.js',
 ]
 
 project_resources = gnome.compile_resources(

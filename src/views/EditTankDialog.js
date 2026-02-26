@@ -2,21 +2,22 @@ import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
 
-import { createTank } from '../database.js';
+import { createTank, updateTank } from '../database.js';
 
-export class AddTankDialog extends Adw.Dialog {
+export class EditTankDialog extends Adw.Dialog {
     static {
         GObject.registerClass({
-            GTypeName: 'AddTankDialog',
+            GTypeName: 'EditTankDialog',
             Signals: {
-                'tank-added': {},
+                'tank-saved': {},
             },
         }, this);
     }
 
-    _init(parentWindow) {
+    _init(parentWindow, tank = null) {
+        this._tank = tank;
         super._init({
-            title: 'Add New Tank',
+            title: tank ? 'Edit Tank' : 'Add New Tank',
             content_width: 400,
             content_height: 500,
         });
@@ -27,7 +28,7 @@ export class AddTankDialog extends Adw.Dialog {
     _setupUI() {
         const toolbarView = new Adw.ToolbarView();
         const headerBar = new Adw.HeaderBar({
-            title_widget: new Gtk.Label({ label: 'Add Tank', css_classes: ['title'] }),
+            title_widget: new Gtk.Label({ label: this._tank ? 'Edit Tank' : 'Add Tank', css_classes: ['title'] }),
             show_end_title_buttons: false,
             show_start_title_buttons: false
         });
@@ -67,6 +68,14 @@ export class AddTankDialog extends Adw.Dialog {
         this._dateEntry = new Adw.EntryRow({ title: 'Setup Date', text: new Date().toISOString().split('T')[0] });
         group.add(this._dateEntry);
 
+        if (this._tank) {
+            this._nameEntry.text = this._tank.name;
+            this._volumeEntry.text = this._tank.volume.toString();
+            this._dateEntry.text = this._tank.setupDate;
+            const types = ['Freshwater', 'Saltwater', 'Brackish'];
+            this._typeRow.selected = Math.max(0, types.indexOf(this._tank.type));
+        }
+
         mainBox.append(group);
 
         const actionBox = new Gtk.Box({
@@ -78,8 +87,8 @@ export class AddTankDialog extends Adw.Dialog {
 
         const cancelBtn = new Gtk.Button({ label: 'Cancel' });
         cancelBtn.connect('clicked', () => this.close());
-        const addBtn = new Gtk.Button({ label: 'Add', css_classes: ['suggested-action'] });
-        addBtn.connect('clicked', () => this._onAdd());
+        const addBtn = new Gtk.Button({ label: this._tank ? 'Save' : 'Add', css_classes: ['suggested-action'] });
+        addBtn.connect('clicked', () => this._onSave());
 
         actionBox.append(cancelBtn);
         actionBox.append(addBtn);
@@ -97,25 +106,25 @@ export class AddTankDialog extends Adw.Dialog {
         this.set_child(toolbarView);
     }
 
-    _onAdd() {
+    _onSave() {
         const name = this._nameEntry.text;
-        const volume = parseFloat(this._volumeEntry.text);
+        const volume = parseFloat(this._volumeEntry.text) || 0;
         const typeIndex = this._typeRow.selected;
         const type = ['Freshwater', 'Saltwater', 'Brackish'][typeIndex];
         const date = this._dateEntry.text;
 
         if (!name) {
-            // Show error toast?
             return;
         }
 
-        // Call database
         try {
-            createTank({ name, volume, type, setupDate: date });
+            if (this._tank) {
+                updateTank(this._tank.id, { name, volume, type, setupDate: date });
+            } else {
+                createTank({ name, volume, type, setupDate: date });
+            }
             this.close();
-            // Emit signal or callback to refresh main window?
-            // The main window should listen to database changes or we pass a callback.
-            this.emit('tank-added');
+            this.emit('tank-saved');
         } catch (e) {
             console.error(e);
         }

@@ -142,6 +142,10 @@ function _createTables() {
             action_taken TEXT,
             notes TEXT,
             FOREIGN KEY(task_template_id) REFERENCES task_templates(id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
         )`
     ];
 
@@ -194,6 +198,141 @@ export function createTank(tankData) {
     }
 }
 
+export function updateTank(tankId, tankData) {
+    if (!_connection) {
+        console.error('Database not initialized');
+        return;
+    }
+    const safeName = tankData.name ? tankData.name.replace(/'/g, "''") : '';
+    const sql = `UPDATE tanks SET name='${safeName}', volume=${tankData.volume}, type='${tankData.type}', setup_date='${tankData.setupDate}' WHERE id=${tankId}`;
+    try {
+        _connection.execute_non_select_command(sql);
+        console.log('Tank updated');
+    } catch (e) {
+        console.error('Failed to update tank:', e);
+    }
+}
+
+export function duplicateTank(sourceTankId, newName, options = { parameters: true, tasks: true, livestock: false }) {
+    if (!_connection) return null;
+    try {
+        // 1. Get source tank data
+        let sourceTank = null;
+        const tankDm = _connection.execute_select_command(`SELECT volume, type, setup_date, image_path FROM tanks WHERE id=${sourceTankId}`);
+        if (tankDm.get_n_rows() > 0) {
+            sourceTank = {
+                volume: tankDm.get_value_at(0, 0),
+                type: tankDm.get_value_at(1, 0),
+                setup_date: tankDm.get_value_at(2, 0),
+                image_path: tankDm.get_value_at(3, 0)
+            };
+        } else {
+            return null; // Not found
+        }
+
+        // 2. Insert new tank
+        const safeName = newName ? newName.replace(/'/g, "''") : '';
+        const volume = sourceTank.volume || 'NULL';
+        const typeStr = sourceTank.type || '';
+        const setupStr = sourceTank.setup_date || '';
+        const imgStr = sourceTank.image_path || '';
+
+        _connection.execute_non_select_command(`INSERT INTO tanks (name, volume, type, setup_date, image_path) VALUES ('${safeName}', ${volume}, '${typeStr}', '${setupStr}', '${imgStr}')`);
+
+        let newTankId = null;
+        const newIdDm = _connection.execute_select_command("SELECT last_insert_rowid()");
+        if (newIdDm.get_n_rows() > 0) {
+            newTankId = newIdDm.get_value_at(0, 0);
+        } else {
+            return null;
+        }
+
+        // 3. Duplicate Parameters
+        if (options.parameters) {
+            const pdDm = _connection.execute_select_command(`SELECT name, min_value, max_value, unit, color FROM parameter_definitions WHERE tank_id=${sourceTankId}`);
+            for (let i = 0; i < pdDm.get_n_rows(); i++) {
+                const pname = pdDm.get_value_at(0, i).replace(/'/g, "''");
+                const minV = pdDm.get_value_at(1, i);
+                const maxV = pdDm.get_value_at(2, i);
+                const unit = (pdDm.get_value_at(3, i) || '').replace(/'/g, "''");
+                const color = pdDm.get_value_at(4, i) || '#3584e4';
+                _connection.execute_non_select_command(`INSERT INTO parameter_definitions (tank_id, name, min_value, max_value, unit, color) VALUES (${newTankId}, '${pname}', ${minV}, ${maxV}, '${unit}', '${color}')`);
+            }
+            const pDm = _connection.execute_select_command(`SELECT type, value, date_logged, notes FROM parameters WHERE tank_id=${sourceTankId}`);
+            for (let i = 0; i < pDm.get_n_rows(); i++) {
+                const ptype = pDm.get_value_at(0, i).replace(/'/g, "''");
+                const pval = pDm.get_value_at(1, i);
+                const pdate = pDm.get_value_at(2, i);
+                const pnote = (pDm.get_value_at(3, i) || '').replace(/'/g, "''");
+                _connection.execute_non_select_command(`INSERT INTO parameters (tank_id, type, value, date_logged, notes) VALUES (${newTankId}, '${ptype}', ${pval}, '${pdate}', '${pnote}')`);
+            }
+        }
+
+        // 4. Duplicate Tasks
+        if (options.tasks) {
+            const taskDm = _connection.execute_select_command(`SELECT equipment_id, category, title, instructions, schedule_type, interval_value, next_due_date, notification_time, status FROM task_templates WHERE tank_id=${sourceTankId}`);
+            for (let i = 0; i < taskDm.get_n_rows(); i++) {
+                const eqId = taskDm.get_value_at(0, i) || 'NULL';
+                const cat = (taskDm.get_value_at(1, i) || '').replace(/'/g, "''");
+                const title = (taskDm.get_value_at(2, i) || '').replace(/'/g, "''");
+                const inst = (taskDm.get_value_at(3, i) || '').replace(/'/g, "''");
+                const sType = taskDm.get_value_at(4, i) || '';
+                const iVal = taskDm.get_value_at(5, i) || 'NULL';
+                const nextDate = taskDm.get_value_at(6, i) || '';
+                const notifTime = taskDm.get_value_at(7, i) ? "'" + taskDm.get_value_at(7, i) + "'" : 'NULL';
+                const status = taskDm.get_value_at(8, i) || 'Active';
+
+                _connection.execute_non_select_command(`INSERT INTO task_templates(tank_id, equipment_id, category, title, instructions, schedule_type, interval_value, next_due_date, notification_time, status) VALUES(${newTankId}, ${eqId}, '${cat}', '${title}', '${inst}', '${sType}', ${iVal}, '${nextDate}', ${notifTime}, '${status}')`);
+            }
+        }
+
+        // 5. Duplicate Livestock
+        if (options.livestock) {
+            const lsDm = _connection.execute_select_command(`SELECT name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status, measurable1_label, measurable1_unit, measurable2_label, measurable2_unit FROM livestock WHERE tank_id = ${sourceTankId} `);
+            for (let i = 0; i < lsDm.get_n_rows(); i++) {
+                const name = (lsDm.get_value_at(0, i) || '').replace(/'/g, "''");
+                const scName = (lsDm.get_value_at(1, i) || '').replace(/'/g, "''");
+                const type = (lsDm.get_value_at(2, i) || '').replace(/'/g, "''");
+                const introDate = lsDm.get_value_at(3, i) || '';
+                const qty = lsDm.get_value_at(4, i) || 1;
+                const src = (lsDm.get_value_at(5, i) || '').replace(/'/g, "''");
+                const pDate = lsDm.get_value_at(6, i) || '';
+                const cost = lsDm.get_value_at(7, i) || 0.0;
+                const notes = (lsDm.get_value_at(8, i) || '').replace(/'/g, "''");
+                const img = lsDm.get_value_at(9, i) || '';
+                const status = lsDm.get_value_at(10, i) || 'Alive';
+                const m1l = (lsDm.get_value_at(11, i) || '').replace(/'/g, "''");
+                const m1u = (lsDm.get_value_at(12, i) || '').replace(/'/g, "''");
+                const m2l = (lsDm.get_value_at(13, i) || '').replace(/'/g, "''");
+                const m2u = (lsDm.get_value_at(14, i) || '').replace(/'/g, "''");
+
+                _connection.execute_non_select_command(`INSERT INTO livestock(tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status, measurable1_label, measurable1_unit, measurable2_label, measurable2_unit) VALUES(${newTankId}, '${name}', '${scName}', '${type}', '${introDate}', ${qty}, '${src}', '${pDate}', ${cost}, '${notes}', '${img}', '${status}', '${m1l}', '${m1u}', '${m2l}', '${m2u}')`);
+            }
+        }
+
+        return newTankId;
+    } catch (e) {
+        console.error('Failed to duplicate tank:', e);
+        return null;
+    }
+}
+
+export function deleteTank(tankId) {
+    if (!_connection) return;
+    try {
+        _connection.execute_non_select_command(`DELETE FROM task_activities WHERE task_template_id IN(SELECT id FROM task_templates WHERE tank_id = ${tankId})`);
+        _connection.execute_non_select_command(`DELETE FROM task_templates WHERE tank_id = ${tankId} `);
+        _connection.execute_non_select_command(`DELETE FROM livestock_updates WHERE livestock_id IN(SELECT id FROM livestock WHERE tank_id = ${tankId})`);
+        _connection.execute_non_select_command(`DELETE FROM livestock_timeline WHERE livestock_id IN(SELECT id FROM livestock WHERE tank_id = ${tankId})`);
+        _connection.execute_non_select_command(`DELETE FROM livestock WHERE tank_id = ${tankId} `);
+        _connection.execute_non_select_command(`DELETE FROM parameters WHERE tank_id = ${tankId} `);
+        _connection.execute_non_select_command(`DELETE FROM parameter_definitions WHERE tank_id = ${tankId} `);
+        _connection.execute_non_select_command(`DELETE FROM tanks WHERE id = ${tankId} `);
+    } catch (e) {
+        console.error('Failed to delete tank:', e);
+    }
+}
+
 export function getTanks() {
     if (!_connection) return [];
     try {
@@ -221,7 +360,7 @@ export function getParameterDefinitions(tankId) {
     if (!_connection) return [];
     try {
         const sql = `SELECT * FROM parameter_definitions WHERE tank_id = ${tankId} ORDER BY name ASC`;
-        console.log(`[DB] getParameterDefinitions SQL: ${sql}`);
+        console.log(`[DB] getParameterDefinitions SQL: ${sql} `);
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
         const defs = [];
@@ -250,10 +389,10 @@ export function upsertParameterDefinition(def) {
         const color = def.color || '#3584e4';
         if (def.id) {
             // Update
-            sql = `UPDATE parameter_definitions SET name='${def.name}', min_value=${def.min_value}, max_value=${def.max_value}, unit='${def.unit}', color='${color}' WHERE id=${def.id}`;
+            sql = `UPDATE parameter_definitions SET name = '${def.name}', min_value = ${def.min_value}, max_value = ${def.max_value}, unit = '${def.unit}', color = '${color}' WHERE id = ${def.id} `;
         } else {
             // Insert
-            sql = `INSERT INTO parameter_definitions (tank_id, name, min_value, max_value, unit, color) VALUES (${def.tank_id}, '${def.name}', ${def.min_value}, ${def.max_value}, '${def.unit}', '${color}')`;
+            sql = `INSERT INTO parameter_definitions(tank_id, name, min_value, max_value, unit, color) VALUES(${def.tank_id}, '${def.name}', ${def.min_value}, ${def.max_value}, '${def.unit}', '${color}')`;
         }
         _connection.execute_non_select_command(sql);
 
@@ -268,7 +407,7 @@ export function upsertParameterDefinition(def) {
 export function deleteParameterDefinition(id) {
     if (!_connection) return;
     try {
-        const sql = `DELETE FROM parameter_definitions WHERE id=${id}`;
+        const sql = `DELETE FROM parameter_definitions WHERE id = ${id} `;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to delete parameter definition:', e);
@@ -279,7 +418,7 @@ export function getLivestock(tankId) {
     if (!_connection) return [];
     try {
         const sql = `SELECT id, tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status, measurable1_label, measurable1_unit, measurable2_label, measurable2_unit FROM livestock WHERE tank_id = ${tankId} ORDER BY name ASC`;
-        console.log(`[DB] getLivestock SQL: ${sql}`);
+        console.log(`[DB] getLivestock SQL: ${sql} `);
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
         const items = [];
@@ -335,29 +474,29 @@ export function upsertLivestock(item) {
 
         if (item.id) {
             // Update
-            sql = `UPDATE livestock SET 
-                name='${name}', 
-                scientific_name='${scientific_name}', 
-                type='${type}', 
-                introduced_date='${introduced_date}', 
-                quantity=${quantity}, 
-                source='${source}', 
-                purchase_date='${purchase_date}', 
-                cost=${cost}, 
-                notes='${notes}', 
-                image_path='${image_path}', 
-                status='${status}',
-                measurable1_label='${measurable1_label}',
-                measurable1_unit='${measurable1_unit}',
-                measurable2_label='${measurable2_label}',
-                measurable2_unit='${measurable2_unit}'
-                WHERE id=${item.id}`;
+            sql = `UPDATE livestock SET
+                name = '${name}',
+                    scientific_name = '${scientific_name}',
+                    type = '${type}',
+                    introduced_date = '${introduced_date}',
+                    quantity = ${quantity},
+                source = '${source}',
+                    purchase_date = '${purchase_date}',
+                    cost = ${cost},
+                notes = '${notes}',
+                    image_path = '${image_path}',
+                    status = '${status}',
+                    measurable1_label = '${measurable1_label}',
+                    measurable1_unit = '${measurable1_unit}',
+                    measurable2_label = '${measurable2_label}',
+                    measurable2_unit = '${measurable2_unit}'
+                WHERE id = ${item.id} `;
             _connection.execute_non_select_command(sql);
             return item.id;
         } else {
             // Insert
-            sql = `INSERT INTO livestock (tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status, measurable1_label, measurable1_unit, measurable2_label, measurable2_unit) 
-                VALUES (${item.tank_id}, '${name}', '${scientific_name}', '${type}', '${introduced_date}', ${quantity}, '${source}', '${purchase_date}', ${cost}, '${notes}', '${image_path}', '${status}', '${measurable1_label}', '${measurable1_unit}', '${measurable2_label}', '${measurable2_unit}')`;
+            sql = `INSERT INTO livestock(tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status, measurable1_label, measurable1_unit, measurable2_label, measurable2_unit)
+                VALUES(${item.tank_id}, '${name}', '${scientific_name}', '${type}', '${introduced_date}', ${quantity}, '${source}', '${purchase_date}', ${cost}, '${notes}', '${image_path}', '${status}', '${measurable1_label}', '${measurable1_unit}', '${measurable2_label}', '${measurable2_unit}')`;
             _connection.execute_non_select_command(sql);
 
             const rSql = "SELECT last_insert_rowid()";
@@ -376,7 +515,7 @@ export function upsertLivestock(item) {
 export function deleteLivestock(id) {
     if (!_connection) return;
     try {
-        const sql = `DELETE FROM livestock WHERE id=${id}`;
+        const sql = `DELETE FROM livestock WHERE id = ${id} `;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to delete livestock:', e);
@@ -417,8 +556,8 @@ export function insertLivestockUpdate(data) {
         const m2 = typeof data.measurable2 === 'number' ? data.measurable2 : 'NULL';
         const logDate = data.log_date || new Date().toISOString().split('T')[0];
 
-        const sql = `INSERT INTO livestock_updates (livestock_id, log_date, note, measurable1, measurable2, image_filename) 
-                     VALUES (${data.livestock_id}, '${logDate}', '${note}', ${m1}, ${m2}, ${img})`;
+        const sql = `INSERT INTO livestock_updates(livestock_id, log_date, note, measurable1, measurable2, image_filename)
+                VALUES(${data.livestock_id}, '${logDate}', '${note}', ${m1}, ${m2}, ${img})`;
         _connection.execute_non_select_command(sql);
         return true;
     } catch (e) {
@@ -430,7 +569,7 @@ export function insertLivestockUpdate(data) {
 export function deleteLivestockUpdate(id) {
     if (!_connection) return;
     try {
-        const sql = `DELETE FROM livestock_updates WHERE id=${id}`;
+        const sql = `DELETE FROM livestock_updates WHERE id = ${id} `;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to delete livestock update:', e);
@@ -440,7 +579,7 @@ export function deleteLivestockUpdate(id) {
 export function insertParameter(tankId, type, value, dateLogged, notes = '') {
     if (!_connection) return;
     try {
-        const sql = `INSERT INTO parameters (tank_id, type, value, date_logged, notes) VALUES (${tankId}, '${type}', ${value}, '${dateLogged}', '${notes}')`;
+        const sql = `INSERT INTO parameters(tank_id, type, value, date_logged, notes) VALUES(${tankId}, '${type}', ${value}, '${dateLogged}', '${notes}')`;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to insert parameter:', e);
@@ -458,7 +597,7 @@ export function getParametersByDate(dateStr) {
             LEFT JOIN parameter_definitions pd ON p.tank_id = pd.tank_id AND p.type = pd.name
             WHERE p.date_logged LIKE '${dateStr}%'
             ORDER BY t.name ASC, p.type ASC
-        `;
+                    `;
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
         const results = [];
@@ -488,7 +627,7 @@ export function getLatestParameterResult(tankId, paramName) {
             WHERE tank_id = ${tankId} AND type = '${paramName}'
             ORDER BY date_logged DESC, id DESC
             LIMIT 1
-        `;
+                    `;
         const dm = _connection.execute_select_command(sql);
         if (dm.get_n_rows() > 0) {
             return {
@@ -532,7 +671,7 @@ export function getParameterHistory(tankId, type) {
 export function deleteParameterRecord(id) {
     if (!_connection) return;
     try {
-        const sql = `DELETE FROM parameters WHERE id=${id}`;
+        const sql = `DELETE FROM parameters WHERE id = ${id} `;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to delete parameter record:', e);
@@ -547,7 +686,7 @@ export function getTasksByDate(dateStr) {
             FROM task_templates t
             JOIN tanks tk ON t.tank_id = tk.id
             WHERE t.next_due_date LIKE '${dateStr}%' AND t.status != 'Archived'
-        `;
+                    `;
         let dm = _connection.execute_select_command(dueSql);
         let numRows = dm.get_n_rows();
         const due = [];
@@ -569,7 +708,7 @@ export function getTasksByDate(dateStr) {
             JOIN task_templates t ON a.task_template_id = t.id
             JOIN tanks tk ON t.tank_id = tk.id
             WHERE a.execution_date LIKE '${dateStr}%'
-        `;
+                    `;
         dm = _connection.execute_select_command(actSql);
         numRows = dm.get_n_rows();
         const activities = [];
@@ -600,7 +739,7 @@ export function getLivestockEventsByDate(dateStr) {
             FROM livestock l
             JOIN tanks t ON l.tank_id = t.id
             WHERE l.purchase_date LIKE '${dateStr}%' OR l.introduced_date LIKE '${dateStr}%'
-        `;
+                    `;
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
         const purchased = [];
@@ -623,7 +762,7 @@ export function getLivestockEventsByDate(dateStr) {
             JOIN livestock l ON u.livestock_id = l.id
             JOIN tanks t ON l.tank_id = t.id
             WHERE u.log_date LIKE '${dateStr}%'
-        `;
+                    `;
         const uDm = _connection.execute_select_command(updatesSql);
         const updatesNumRows = uDm.get_n_rows();
         const updates = [];
@@ -658,13 +797,13 @@ export function getEventsInRange(tankId, startDate) {
             FROM task_activities ta
             JOIN task_templates tt ON ta.task_template_id = tt.id
             WHERE tt.tank_id = ${tankId} 
-              AND ta.execution_date >= '${startDate}' 
-        `;
+              AND ta.execution_date >= '${startDate}'
+                    `;
         const taskDm = _connection.execute_select_command(taskSql);
         for (let i = 0; i < taskDm.get_n_rows(); i++) {
             events.push({
                 type: 'task',
-                label: `${taskDm.get_value_at(2, i)} Task: ${taskDm.get_value_at(0, i)}`,
+                label: `${taskDm.get_value_at(2, i)} Task: ${taskDm.get_value_at(0, i)} `,
                 date: taskDm.get_value_at(1, i).split('T')[0] // normalize
             });
         }
@@ -676,12 +815,12 @@ export function getEventsInRange(tankId, startDate) {
             WHERE tank_id = ${tankId}
               AND introduced_date >= '${startDate}'
               AND introduced_date IS NOT NULL AND introduced_date != ''
-        `;
+                    `;
         const lsDm = _connection.execute_select_command(lsSql);
         for (let i = 0; i < lsDm.get_n_rows(); i++) {
             events.push({
                 type: 'livestock',
-                label: `Introduced Livestock: ${lsDm.get_value_at(0, i)}`,
+                label: `Introduced Livestock: ${lsDm.get_value_at(0, i)} `,
                 date: lsDm.get_value_at(1, i).split('T')[0]
             });
         }
@@ -769,14 +908,14 @@ export function upsertTaskTemplate(task) {
         let sql;
 
         if (task.id) {
-            sql = `UPDATE task_templates SET 
-                equipment_id=${eqId}, category='${task.category}', title='${title}', instructions='${ins}', 
-                schedule_type='${task.schedule_type}', interval_value=${intVal}, next_due_date='${task.next_due_date}',
-                notification_time=${notifTime}
-                WHERE id=${task.id}`;
+            sql = `UPDATE task_templates SET
+                equipment_id = ${eqId}, category = '${task.category}', title = '${title}', instructions = '${ins}',
+                    schedule_type = '${task.schedule_type}', interval_value = ${intVal}, next_due_date = '${task.next_due_date}',
+                        notification_time = ${notifTime}
+                WHERE id = ${task.id} `;
         } else {
-            sql = `INSERT INTO task_templates (tank_id, equipment_id, category, title, instructions, schedule_type, interval_value, next_due_date, notification_time, status) 
-                   VALUES (${task.tank_id}, ${eqId}, '${task.category}', '${title}', '${ins}', '${task.schedule_type}', ${intVal}, '${task.next_due_date}', ${notifTime}, 'Active')`;
+            sql = `INSERT INTO task_templates(tank_id, equipment_id, category, title, instructions, schedule_type, interval_value, next_due_date, notification_time, status)
+                VALUES(${task.tank_id}, ${eqId}, '${task.category}', '${title}', '${ins}', '${task.schedule_type}', ${intVal}, '${task.next_due_date}', ${notifTime}, 'Active')`;
         }
         _connection.execute_non_select_command(sql);
     } catch (e) {
@@ -787,7 +926,7 @@ export function upsertTaskTemplate(task) {
 export function archiveTaskTemplate(templateId) {
     if (!_connection) return;
     try {
-        const sql = `UPDATE task_templates SET status='Archived' WHERE id=${templateId}`;
+        const sql = `UPDATE task_templates SET status = 'Archived' WHERE id = ${templateId} `;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to archive task template:', e);
@@ -797,7 +936,7 @@ export function archiveTaskTemplate(templateId) {
 export function copyTaskTemplate(templateId, targetTankId) {
     if (!_connection) return;
     try {
-        const fetchSql = `SELECT category, title, instructions, schedule_type, interval_value, next_due_date FROM task_templates WHERE id=${templateId}`;
+        const fetchSql = `SELECT category, title, instructions, schedule_type, interval_value, next_due_date FROM task_templates WHERE id = ${templateId} `;
         const dm = _connection.execute_select_command(fetchSql);
         if (dm.get_n_rows() > 0) {
             const cat = dm.get_value_at(0, 0);
@@ -807,8 +946,8 @@ export function copyTaskTemplate(templateId, targetTankId) {
             const val = dm.get_value_at(4, 0);
             const next = dm.get_value_at(5, 0);
 
-            const insertSql = `INSERT INTO task_templates (tank_id, category, title, instructions, schedule_type, interval_value, next_due_date, status)
-                               VALUES (${targetTankId}, '${cat}', '${title}', '${inst}', '${type}', ${val}, '${next}', 'Active')`;
+            const insertSql = `INSERT INTO task_templates(tank_id, category, title, instructions, schedule_type, interval_value, next_due_date, status)
+                VALUES(${targetTankId}, '${cat}', '${title}', '${inst}', '${type}', ${val}, '${next}', 'Active')`;
             _connection.execute_non_select_command(insertSql);
         }
     } catch (e) {
@@ -819,7 +958,7 @@ export function copyTaskTemplate(templateId, targetTankId) {
 export function restoreTaskTemplate(id) {
     if (!_connection) return;
     try {
-        const sql = `UPDATE task_templates SET status='Active' WHERE id=${id}`;
+        const sql = `UPDATE task_templates SET status = 'Active' WHERE id = ${id} `;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to restore task template:', e);
@@ -829,10 +968,10 @@ export function restoreTaskTemplate(id) {
 export function permanentlyDeleteTaskTemplate(id) {
     if (!_connection) return;
     try {
-        const sqlActs = `DELETE FROM task_activities WHERE task_template_id=${id}`;
+        const sqlActs = `DELETE FROM task_activities WHERE task_template_id = ${id} `;
         _connection.execute_non_select_command(sqlActs);
 
-        const sql = `DELETE FROM task_templates WHERE id=${id}`;
+        const sql = `DELETE FROM task_templates WHERE id = ${id} `;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to hard delete task template:', e);
@@ -845,13 +984,13 @@ export function logTaskActivity(templateId, actionTaken, notes, executionDateStr
         const safeNotes = notes ? notes.replace(/'/g, "''") : '';
 
         // 1. Insert the log entry
-        const sqlLog = `INSERT INTO task_activities (task_template_id, execution_date, action_taken, notes) 
-                        VALUES (${templateId}, '${executionDateStr}', '${actionTaken}', '${safeNotes}')`;
+        const sqlLog = `INSERT INTO task_activities(task_template_id, execution_date, action_taken, notes)
+                VALUES(${templateId}, '${executionDateStr}', '${actionTaken}', '${safeNotes}')`;
         _connection.execute_non_select_command(sqlLog);
 
         // 2. Update the template's next_due_date
         if (nextDueDateStr) {
-            const sqlUpdate = `UPDATE task_templates SET next_due_date='${nextDueDateStr}' WHERE id=${templateId}`;
+            const sqlUpdate = `UPDATE task_templates SET next_due_date = '${nextDueDateStr}' WHERE id = ${templateId} `;
             _connection.execute_non_select_command(sqlUpdate);
         }
     } catch (e) {
@@ -862,7 +1001,7 @@ export function logTaskActivity(templateId, actionTaken, notes, executionDateStr
 export function getTaskActivities(templateId) {
     if (!_connection) return [];
     try {
-        const sql = `SELECT * FROM task_activities WHERE task_template_id=${templateId} ORDER BY execution_date DESC`;
+        const sql = `SELECT * FROM task_activities WHERE task_template_id = ${templateId} ORDER BY execution_date DESC`;
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
         const results = [];
@@ -885,9 +1024,56 @@ export function getTaskActivities(templateId) {
 export function deleteTaskActivity(activityId) {
     if (!_connection) return;
     try {
-        const sql = `DELETE FROM task_activities WHERE id=${activityId}`;
+        const sql = `DELETE FROM task_activities WHERE id = ${activityId} `;
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to delete task activity:', e);
+    }
+}
+
+export function resetDatabase() {
+    if (!_connection) return;
+    try {
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS task_activities");
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS task_templates");
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS parameter_definitions");
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS livestock_updates");
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS livestock_timeline");
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS livestock");
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS species_cache");
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS parameters");
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS tanks");
+        _connection.execute_non_select_command("DROP TABLE IF EXISTS settings");
+        _createTables();
+    } catch (e) {
+        console.error('Failed to reset database:', e);
+    }
+}
+
+export function getSetting(key, defaultVal = null) {
+    if (!_connection) return defaultVal;
+    try {
+        const sql = `SELECT value FROM settings WHERE key = '${key}'`;
+        const dm = _connection.execute_select_command(sql);
+        if (dm.get_n_rows() > 0) {
+            return dm.get_value_at(0, 0);
+        }
+    } catch (e) {
+        // Table might be creating or missing
+    }
+    return defaultVal;
+}
+
+export function setSetting(key, val) {
+    if (!_connection) return;
+    try {
+        const safeKey = key.replace(/'/g, "''");
+        // Check if boolean or string
+        let safeVal = (val === null || val === undefined) ? '' : val.toString().replace(/'/g, "''");
+
+        const sql = `INSERT OR REPLACE INTO settings(key, value) VALUES('${safeKey}', '${safeVal}')`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to set setting:', e);
     }
 }
