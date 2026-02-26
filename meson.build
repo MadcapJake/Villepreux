@@ -13,7 +13,7 @@ dependency('gobject-introspection-1.0', version: '>= 1.35.9')
 dependency('gtk4', version: '>= 4.10.0')
 dependency('libadwaita-1', version: '>= 1.4.0')
 
-base_id = 'com.github.madcapjake.Villepreux'
+base_id = 'io.github.madcapjake.Villepreux'
 
 pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), meson.project_name())
 moduledir = join_paths(pkgdatadir, 'src')

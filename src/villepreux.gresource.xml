@@ -35,5 +35,10 @@
     <file preprocess="xml-stripblanks">icons/scalable/actions/restaurant-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/seal-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/wrench-wide-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/coral-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/fish-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/seaweed-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/shrimp-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/turtle-symbolic.svg</file>
   </gresource>
 </gresources>

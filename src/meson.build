@@ -23,7 +23,7 @@ install_data(project_sources, install_dir: moduledir)
 install_data(
   'icons/scalable/apps/villepreux-symbolic.svg',
   install_dir: join_paths(get_option('datadir'), 'icons/hicolor/scalable/apps'),
-  rename: 'com.github.madcapjake.Villepreux-symbolic.svg'
+  rename: 'io.github.madcapjake.Villepreux-symbolic.svg'
 )
 
 # Install notification category icons for GNOME Shell (needs AppID prefix to escape sandbox)
@@ -39,7 +39,7 @@ foreach icon_name : notification_icons
   install_data(
     join_paths('icons/scalable/actions', icon_name),
     install_dir: join_paths(get_option('datadir'), 'icons/hicolor/scalable/actions'),
-    rename: 'com.github.madcapjake.Villepreux-' + icon_name
+    rename: 'io.github.madcapjake.Villepreux-' + icon_name
   )
 endforeach
 

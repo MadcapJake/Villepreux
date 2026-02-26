@@ -73,7 +73,7 @@ class NotificationService {
         notification.set_body(`Tank: ${task.tank_name}`);
 
         const iconName = getTaskCategoryIcon(task.category);
-        const icon = Gio.ThemedIcon.new(`com.github.madcapjake.Villepreux-${iconName}`);
+        const icon = Gio.ThemedIcon.new(`io.github.madcapjake.Villepreux-${iconName}`);
         notification.set_icon(icon);
 
         // Pass the task ID as string parameter to the actions

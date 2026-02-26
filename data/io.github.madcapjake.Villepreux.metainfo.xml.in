@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.madcapjake.Villepreux</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Villepreux</name>
+  <summary>Manage aquarium husbandry</summary>
+  <description>
+    <p>Villepreux is a native Linux desktop application designed to manage aquarium husbandry.</p>
+  </description>
+  <launchable type="desktop-id">io.github.madcapjake.Villepreux.desktop</launchable>
+  <url type="homepage">https://github.com/MadcapJake/Villepreux</url>
+  <url type="vcs-browser">https://github.com/MadcapJake/Villepreux</url>
+  <url type="bugtracker">https://github.com/MadcapJake/Villepreux/issues</url>
+  <developer id="io.github.madcapjake">
+    <name>MadcapJake</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-02-24">
+      <description>
+        <p>Initial release of Villepreux aquarium manager.</p>
+      </description>
+    </release>
+  </releases>
+  <screenshots>
+    <screenshot type="default">
+      <image type="source">https://raw.githubusercontent.com/MadcapJake/Villepreux/main/data/screenshot.png</image>
+    </screenshot>
+  </screenshots>
+</component>

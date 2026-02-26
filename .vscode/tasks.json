@@ -4,7 +4,7 @@
         {
             "label": "Build Flatpak",
             "type": "shell",
-            "command": "flatpak-builder --user --install --install-deps-from=flathub --force-clean build-dir com.github.madcapjake.Villepreux.json",
+            "command": "flatpak-builder --user --install --install-deps-from=flathub --force-clean build-dir io.github.madcapjake.Villepreux.json",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -22,7 +22,7 @@
         {
             "label": "Run Flatpak",
             "type": "shell",
-            "command": "flatpak run com.github.madcapjake.Villepreux",
+            "command": "flatpak run io.github.madcapjake.Villepreux",
             "group": "test",
             "dependsOn": "Build Flatpak",
             "presentation": {

@@ -8,6 +8,7 @@ import Pango from 'gi://Pango';
 
 import * as DB from '../database.js';
 import { ImageHandler } from '../utils/image_handler.js';
+import { getLivestockCategoryIcon } from '../utils/icons.js';
 
 export const LivestockView = GObject.registerClass(
     class LivestockView extends Adw.Bin {
@@ -54,21 +55,10 @@ export const LivestockView = GObject.registerClass(
                 spacing: 24,
             });
 
-            // Livestock Grid
-            this._flowBox = new Gtk.FlowBox({
-                valign: Gtk.Align.START,
-                halign: Gtk.Align.FILL,
-                min_children_per_line: 1,
-                max_children_per_line: 10,
-                selection_mode: Gtk.SelectionMode.NONE,
-                column_spacing: 12,
-                row_spacing: 12,
-                homogeneous: true,
-            });
+            this.mainBox = mainBox;
+            this.flowBoxes = [];
 
             this._refreshGrid();
-
-            mainBox.append(this._flowBox);
             clamp.set_child(mainBox);
             scroll.set_child(clamp);
             rootPage.set_child(scroll);
@@ -82,18 +72,91 @@ export const LivestockView = GObject.registerClass(
         }
 
         _refreshGrid() {
-            this._flowBox.remove_all();
+            this.flowBoxes = [];
+
+            // To ensure cards in different categories have exactly the same size
+            this.cardSizeGroup = new Gtk.SizeGroup({
+                mode: Gtk.SizeGroupMode.BOTH
+            });
+
+            let child = this.mainBox.get_first_child();
+            while (child) {
+                this.mainBox.remove(child);
+                child = this.mainBox.get_first_child();
+            }
 
             const items = DB.getLivestock(this.tank.id);
 
+            const itemsByType = {
+                'Fish': [],
+                'Invertebrates': [],
+                'Corals & Anemones': [],
+                'Plants & Macroalgae': [],
+                'Amphibians & Reptiles': []
+            };
+
             items.forEach(item => {
-                const card = this._createFishCard(item);
-                this._flowBox.append(card);
+                const t = item.type;
+                if (itemsByType[t] !== undefined) {
+                    itemsByType[t].push(item);
+                } else {
+                    if (!itemsByType['Other']) {
+                        itemsByType['Other'] = [];
+                    }
+                    itemsByType['Other'].push(item);
+                }
             });
 
-            // "Add Fish" Card
-            const addCard = this._createAddCard();
-            this._flowBox.append(addCard);
+            const typeOptions = [
+                'Fish',
+                'Invertebrates',
+                'Corals & Anemones',
+                'Plants & Macroalgae',
+                'Amphibians & Reptiles',
+                'Other'
+            ];
+
+            typeOptions.forEach(typeId => {
+                const typeItems = itemsByType[typeId];
+                if (!typeItems || typeItems.length === 0) return;
+
+                // For 'Other', if we have dynamically added custom categories?
+                // we treat them as 'Other' in terms of visual fallback, but display 'Other'
+                const displayTitle = typeId.replace(/&/g, '&amp;');
+
+                const group = new Adw.PreferencesGroup({
+                    title: displayTitle,
+                });
+
+                const iconResource = getLivestockCategoryIcon(typeId);
+                if (iconResource) {
+                    const headerIcon = new Gtk.Image({
+                        resource: iconResource,
+                        css_classes: ['dim-label'],
+                        margin_bottom: 12
+                    });
+                    group.set_header_suffix(headerIcon);
+                }
+
+                const flowBox = new Gtk.FlowBox({
+                    valign: Gtk.Align.START,
+                    halign: Gtk.Align.FILL,
+                    min_children_per_line: 1,
+                    max_children_per_line: 6,
+                    selection_mode: Gtk.SelectionMode.NONE,
+                    column_spacing: 12,
+                    row_spacing: 12,
+                    homogeneous: true,
+                });
+                this.flowBoxes.push(flowBox);
+
+                typeItems.forEach(item => {
+                    flowBox.append(this._createFishCard(item));
+                });
+
+                group.add(flowBox);
+                this.mainBox.append(group);
+            });
         }
 
         _createFishCard(item) {
@@ -101,8 +164,12 @@ export const LivestockView = GObject.registerClass(
                 css_classes: ['card'],
                 width_request: 160,
                 height_request: 200,
-                hexpand: true,
+                valign: Gtk.Align.START,
+                halign: Gtk.Align.FILL,
+                hexpand: true, // Allow expansion
             });
+
+            this.cardSizeGroup.add_widget(button);
 
             const card = new Gtk.Box({
                 orientation: Gtk.Orientation.VERTICAL,
@@ -114,16 +181,18 @@ export const LivestockView = GObject.registerClass(
             if (item.image_path && item.image_path !== 'Alive' && item.image_path !== 'Deceased') {
                 const fullPath = ImageHandler.getImagePath(item.image_path);
                 try {
+                    // Create a pixbuf scaled to max boundaries to control natural size
                     const pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(fullPath, 160, 120, false);
                     const texture = Gdk.Texture.new_for_pixbuf(pixbuf);
                     imageArea = Gtk.Picture.new_for_paintable(texture);
                 } catch (e) {
                     imageArea = Gtk.Picture.new_for_filename(fullPath);
                 }
+
                 imageArea.set_content_fit(Gtk.ContentFit.COVER);
                 imageArea.can_shrink = true;
-                imageArea.hexpand = true;
                 imageArea.height_request = 120;
+                imageArea.width_request = 160;
                 imageArea.css_classes = ['card-image-area'];
             } else {
                 imageArea = new Gtk.Image({
@@ -169,60 +238,6 @@ export const LivestockView = GObject.registerClass(
                 this._navigateToDetail(item);
             });
 
-            return button;
-        }
-
-        _createAddCard() {
-            const button = new Gtk.Button({
-                css_classes: ['card'],
-                height_request: 200,
-                width_request: 160,
-                hexpand: true,
-            });
-
-            const card = new Gtk.Box({
-                orientation: Gtk.Orientation.VERTICAL,
-                spacing: 12,
-                margin_start: 12,
-                margin_end: 12,
-                margin_top: 12,
-                margin_bottom: 12,
-                valign: Gtk.Align.CENTER,
-                halign: Gtk.Align.CENTER,
-            });
-
-            const icon = new Gtk.Image({
-                icon_name: 'list-add-symbolic',
-                pixel_size: 48,
-                css_classes: ['dim-label'],
-                halign: Gtk.Align.CENTER,
-            });
-
-            const label = new Gtk.Label({
-                label: 'Add Inhabitant',
-                css_classes: ['heading', 'dim-label'],
-                halign: Gtk.Align.CENTER,
-            });
-
-            card.append(icon);
-            card.append(label);
-            button.set_child(card);
-
-            button.connect('clicked', () => {
-                this._navigateToDetail({
-                    tank_id: this.tank.id,
-                    name: '',
-                    scientific_name: '',
-                    type: '',
-                    introduced_date: '',
-                    quantity: 1,
-                    source: '',
-                    purchase_date: '',
-                    cost: 0,
-                    notes: '',
-                    status: 'Alive'
-                });
-            });
             return button;
         }
 
@@ -463,7 +478,39 @@ export const LivestockView = GObject.registerClass(
 
             addEntry('Name', 'name');
             addEntry('Scientific Name', 'scientific_name');
-            addEntry('Type', 'type');
+
+            const typeOptions = [
+                'Fish',
+                'Invertebrates',
+                'Corals & Anemones',
+                'Plants & Macroalgae',
+                'Amphibians & Reptiles'
+            ];
+            const typeModel = Gtk.StringList.new(typeOptions);
+            const typeRow = new Adw.ComboRow({
+                title: 'Type',
+                model: typeModel,
+            });
+
+            let selectedIndex = 0;
+            if (edits.type) {
+                const idx = typeOptions.indexOf(edits.type);
+                if (idx >= 0) {
+                    selectedIndex = idx;
+                }
+            } else {
+                edits.type = typeOptions[0]; // Set default
+            }
+            typeRow.selected = selectedIndex;
+
+            typeRow.connect('notify::selected-item', () => {
+                const selectedItem = typeRow.selected_item;
+                if (selectedItem) {
+                    edits.type = selectedItem.get_string();
+                    onEdit();
+                }
+            });
+            infoGroup.add(typeRow);
             addDateEntry('Introduced On', 'introduced_date');
             addEntry('Quantity', 'quantity', Gtk.InputPurpose.NUMBER);
             addEntry('Purchased From', 'source');

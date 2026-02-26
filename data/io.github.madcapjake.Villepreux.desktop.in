@@ -6,5 +6,5 @@ Exec=villepreux
 Terminal=false
 Categories=GTK;GNOME;Utility;
 Keywords=Aquarium;Fish;Tank;
-Icon=com.github.madcapjake.Villepreux
+Icon=io.github.madcapjake.Villepreux
 StartupNotify=true

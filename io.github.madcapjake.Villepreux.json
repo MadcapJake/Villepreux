@@ -1,5 +1,5 @@
 {
-    "app-id": "com.github.madcapjake.Villepreux",
+    "app-id": "io.github.madcapjake.Villepreux",
     "runtime": "org.gnome.Platform",
     "runtime-version": "49",
     "sdk": "org.gnome.Sdk",
@@ -9,11 +9,7 @@
         "--share=ipc",
         "--socket=fallback-x11",
         "--device=dri",
-        "--socket=wayland",
-        "--filesystem=xdg-run/dconf",
-        "--filesystem=~/.config/dconf:ro",
-        "--talk-name=ca.desrt.dconf",
-        "--env=DCONF_USER_CONFIG_DIR=.config/dconf"
+        "--socket=wayland"
     ],
     "cleanup": [
         "/include",
@@ -50,7 +46,8 @@
                 {
                     "type": "git",
                     "url": "https://gitlab.gnome.org/GNOME/libgda.git",
-                    "tag": "LIBGDA_6_0_0"
+                    "tag": "LIBGDA_6_0_0",
+                    "commit": "5d23892e1c8abd931ad2a7bd24cd543b93ccb04c"
                 }
             ]
         },

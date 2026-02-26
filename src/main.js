@@ -13,7 +13,7 @@ export const VillepreuxApp = GObject.registerClass(
     class VillepreuxApp extends Adw.Application {
         _init() {
             super._init({
-                application_id: 'com.github.madcapjake.Villepreux',
+                application_id: 'io.github.madcapjake.Villepreux',
                 flags: Gio.ApplicationFlags.FLAGS_NONE,
             });
         }

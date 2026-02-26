@@ -1,4 +1,4 @@
-data/com.github.madcapjake.Villepreux.desktop.in
-data/com.github.madcapjake.Villepreux.appdata.xml.in
+data/io.github.madcapjake.Villepreux.desktop.in
+data/io.github.madcapjake.Villepreux.metainfo.xml.in
 src/main.js
 src/window.js
