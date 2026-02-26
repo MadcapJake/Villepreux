@@ -266,7 +266,6 @@ export const LivestockView = GObject.registerClass(
                 label: item.scientific_name || item.type || 'Unknown Species',
                 css_classes: ['caption', 'dim-label'],
                 halign: Gtk.Align.START,
-                use_markup: false
             });
 
             contentBox.append(nameLabel);
@@ -364,7 +363,6 @@ export const LivestockView = GObject.registerClass(
                 label: item.scientific_name || item.type || 'Unknown Species',
                 css_classes: ['dim-label'],
                 halign: Gtk.Align.CENTER,
-                use_markup: false
             });
 
             headerBox.append(heroImg);
@@ -373,10 +371,14 @@ export const LivestockView = GObject.registerClass(
             mainBox.append(headerBox);
 
             // --- B. The Quick Actions Bar ---
-            const quickActionsBox = new Gtk.Box({
-                orientation: Gtk.Orientation.HORIZONTAL,
-                spacing: 12,
-                halign: Gtk.Align.CENTER
+            const quickActionsBox = new Gtk.FlowBox({
+                valign: Gtk.Align.START,
+                halign: Gtk.Align.CENTER,
+                min_children_per_line: 1,
+                max_children_per_line: 3,
+                selection_mode: Gtk.SelectionMode.NONE,
+                column_spacing: 12,
+                row_spacing: 12,
             });
 
             if (item.status === 'Alive') {
@@ -455,7 +457,7 @@ export const LivestockView = GObject.registerClass(
 
             const categoryRow = new Adw.ActionRow({
                 title: 'Category',
-                subtitle: item.type || 'Unknown',
+                subtitle: (item.type || 'Unknown').replace(/&/g, '&amp;'),
             });
             coreGroup.add(categoryRow);
 
@@ -823,8 +825,7 @@ export const LivestockView = GObject.registerClass(
                 'Plants & Macroalgae',
                 'Amphibians & Reptiles'
             ];
-            const escapedOptions = typeOptions.map(t => t.replace(/&/g, '&amp;'));
-            const typeModel = Gtk.StringList.new(escapedOptions);
+            const typeModel = Gtk.StringList.new(typeOptions);
             const typeRow = new Adw.ComboRow({
                 title: 'Type',
                 model: typeModel,
@@ -844,7 +845,7 @@ export const LivestockView = GObject.registerClass(
             typeRow.connect('notify::selected-item', () => {
                 const selectedItem = typeRow.selected_item;
                 if (selectedItem) {
-                    edits.type = selectedItem.get_string().replace(/&amp;/g, '&');
+                    edits.type = selectedItem.get_string();
                     onEdit();
                 }
             });
