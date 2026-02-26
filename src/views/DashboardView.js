@@ -22,7 +22,7 @@ export const DashboardView = GObject.registerClass(
 
             // Livestock Tab
             const livestockView = new LivestockView(tank);
-            this._stack.add_titled(livestockView, 'livestock', 'Livestock');
+            this._stack.add_titled(livestockView, 'livestock', 'Inhabitants');
             this._stack.get_page(livestockView).set_icon_name('fish-symbolic');
 
             // Tasks Tab

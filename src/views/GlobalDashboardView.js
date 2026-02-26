@@ -254,7 +254,7 @@ export const GlobalDashboardView = GObject.registerClass(
 
             if (livestockEvents.purchased.length > 0) {
                 hasData = true;
-                const purGroup = new Adw.PreferencesGroup({ title: 'Livestock Purchased' });
+                const purGroup = new Adw.PreferencesGroup({ title: 'Inhabitants Purchased' });
                 livestockEvents.purchased.forEach(l => {
                     const row = new Adw.ActionRow({
                         title: l.name || 'Unnamed',
@@ -268,7 +268,7 @@ export const GlobalDashboardView = GObject.registerClass(
 
             if (livestockEvents.introduced.length > 0) {
                 hasData = true;
-                const intGroup = new Adw.PreferencesGroup({ title: 'Livestock Introduced' });
+                const intGroup = new Adw.PreferencesGroup({ title: 'Inhabitants Introduced' });
                 livestockEvents.introduced.forEach(l => {
                     const row = new Adw.ActionRow({
                         title: l.name || 'Unnamed',
@@ -282,7 +282,7 @@ export const GlobalDashboardView = GObject.registerClass(
 
             if (livestockEvents.updates && livestockEvents.updates.length > 0) {
                 hasData = true;
-                const updGroup = new Adw.PreferencesGroup({ title: 'Livestock Updates' });
+                const updGroup = new Adw.PreferencesGroup({ title: 'Inhabitant Updates' });
                 livestockEvents.updates.forEach(u => {
                     const row = new Adw.ActionRow({
                         title: u.name || 'Unnamed',

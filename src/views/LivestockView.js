@@ -38,7 +38,7 @@ export const LivestockView = GObject.registerClass(
 
             // --- Root Page ---
             const rootPage = new Adw.NavigationPage({
-                title: 'Livestock',
+                title: 'Inhabitants',
                 tag: 'root',
             });
 

@@ -80,7 +80,7 @@ export class DuplicateTankDialog extends Adw.Dialog {
         tRow.add_prefix(this._tasksCheck);
         tRow.set_activatable_widget(this._tasksCheck);
 
-        const lRow = new Adw.ActionRow({ title: 'Livestock' });
+        const lRow = new Adw.ActionRow({ title: 'Inhabitants' });
         lRow.add_prefix(this._livestockCheck);
         lRow.set_activatable_widget(this._livestockCheck);
 
