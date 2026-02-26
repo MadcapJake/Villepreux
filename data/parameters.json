@@ -1,0 +1,114 @@
+[
+    {
+        "tank_type": "Universal",
+        "param_name": "Temperature",
+        "param_unit": "°F",
+        "param_min": 75.0,
+        "param_max": 80.0
+    },
+    {
+        "tank_type": "Universal",
+        "param_name": "Ammonia (NH3)",
+        "param_unit": "ppm",
+        "param_min": 0.0,
+        "param_max": 0.0
+    },
+    {
+        "tank_type": "Universal",
+        "param_name": "Nitrite (NO2)",
+        "param_unit": "ppm",
+        "param_min": 0.0,
+        "param_max": 0.0
+    },
+    {
+        "tank_type": "Universal",
+        "param_name": "Nitrate (NO3)",
+        "param_unit": "ppm",
+        "param_min": 0.0,
+        "param_max": 20.0
+    },
+    {
+        "tank_type": "Saltwater",
+        "param_name": "Salinity (Specific Gravity)",
+        "param_unit": "sg",
+        "param_min": 1.023,
+        "param_max": 1.026
+    },
+    {
+        "tank_type": "Saltwater",
+        "param_name": "pH",
+        "param_unit": "pH",
+        "param_min": 8.1,
+        "param_max": 8.4
+    },
+    {
+        "tank_type": "Saltwater",
+        "param_name": "Alkalinity",
+        "param_unit": "dKH",
+        "param_min": 8.0,
+        "param_max": 12.0
+    },
+    {
+        "tank_type": "Saltwater",
+        "param_name": "Calcium (Ca)",
+        "param_unit": "ppm",
+        "param_min": 380.0,
+        "param_max": 450.0
+    },
+    {
+        "tank_type": "Saltwater",
+        "param_name": "Magnesium (Mg)",
+        "param_unit": "ppm",
+        "param_min": 1250.0,
+        "param_max": 1350.0
+    },
+    {
+        "tank_type": "Saltwater",
+        "param_name": "Phosphate (PO4)",
+        "param_unit": "ppm",
+        "param_min": 0.01,
+        "param_max": 0.05
+    },
+    {
+        "tank_type": "Freshwater",
+        "param_name": "pH",
+        "param_unit": "pH",
+        "param_min": 6.5,
+        "param_max": 7.5
+    },
+    {
+        "tank_type": "Freshwater",
+        "param_name": "General Hardness (GH)",
+        "param_unit": "dGH",
+        "param_min": 4.0,
+        "param_max": 8.0
+    },
+    {
+        "tank_type": "Freshwater",
+        "param_name": "Carbonate Hardness (KH)",
+        "param_unit": "dKH",
+        "param_min": 4.0,
+        "param_max": 8.0
+    },
+    {
+        "tank_type": "Brackish",
+        "param_name": "Salinity (Specific Gravity)",
+        "param_unit": "sg",
+        "param_min": 1.004,
+        "param_max": 1.015
+    },
+    {
+        "tank_type": "Brackish",
+        "param_name": "pH",
+        "param_unit": "pH",
+        "param_min": 7.5,
+        "param_max": 8.4
+    },
+    {
+        "tank_type": "Brackish",
+        "param_name": "Carbonate Hardness (KH)",
+        "param_unit": "dKH",
+        "param_min": 10.0,
+        "param_max": 15.0
+    }
+]

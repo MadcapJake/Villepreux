@@ -1,6 +1,7 @@
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
+import Gio from 'gi://Gio';
 
 import * as DB from '../database.js';
 import { LogSingleParameterDialog } from './LogSingleParameterDialog.js';
@@ -377,7 +378,21 @@ export const ParameterView = GObject.registerClass(
 
             // State for edits
             const edits = { ...def };
-            if (!edits.color) edits.color = '#3584e4'; // default blue
+
+            if (isNew) {
+                const existingParams = DB.getParameterDefinitions(this.tank.id);
+                if (existingParams.length === 0) {
+                    edits.color = '#3584e4'; // default blue
+                } else {
+                    const usedColors = new Set(existingParams.map(p => p.color.toLowerCase()));
+                    const CSS_COLORS = ['#e66100', '#5e9ca0', '#ffb000', '#dc267f', '#fe6100', '#785ef0', '#648fff', '#ffb000'];
+                    let available = CSS_COLORS.filter(c => !usedColors.has(c));
+                    if (available.length === 0) available = CSS_COLORS;
+                    edits.color = available[Math.floor(Math.random() * available.length)];
+                }
+            } else {
+                if (!edits.color) edits.color = '#3584e4';
+            }
 
             saveBtn.connect('clicked', () => {
                 // Validate (?)
@@ -402,54 +417,102 @@ export const ParameterView = GObject.registerClass(
                 saveBtn.visible = true;
             };
 
-            // Parameter Name
-            const nameRow = new Adw.EntryRow({
-                title: 'Parameter Name',
-                text: def.name || '',
+            const nameRow = new Adw.EntryRow({ title: 'Parameter Name', text: def.name || '' });
+
+            const dropBtn = new Gtk.Button({
+                icon_name: 'go-down-symbolic', // Or pan-down-symbolic
+                valign: Gtk.Align.CENTER,
+                css_classes: ['flat'],
             });
-            nameRow.connect('notify::text', () => {
-                edits.name = nameRow.text;
-                onConfigChanged();
-            });
+            nameRow.add_suffix(dropBtn);
+
+            const minRow = new Adw.EntryRow({ title: 'Min Value', text: String(def.min_value || 0), input_purpose: Gtk.InputPurpose.NUMBER });
+            const maxRow = new Adw.EntryRow({ title: 'Max Value', text: String(def.max_value || 10), input_purpose: Gtk.InputPurpose.NUMBER });
+            const unitRow = new Adw.EntryRow({ title: 'Unit', text: def.unit || '' });
+
+            nameRow.connect('notify::text', () => { edits.name = nameRow.text; onConfigChanged(); });
+            minRow.connect('notify::text', () => { edits.min_value = parseFloat(minRow.text) || 0; onConfigChanged(); });
+            maxRow.connect('notify::text', () => { edits.max_value = parseFloat(maxRow.text) || 10; onConfigChanged(); });
+            unitRow.connect('notify::text', () => { edits.unit = unitRow.text; onConfigChanged(); });
+
             configGroup.add(nameRow);
-
-            // Acceptable Range (Min/Max) - Simplified as one string for now?? 
-            // DB expects min_value and max_value (REAL).
-            // Let's use two rows or split the string? 
-            // Let's use two distinct rows for Min and Max.
-
-            const minRow = new Adw.EntryRow({
-                title: 'Min Value',
-                text: String(def.min_value || 0),
-                input_purpose: Gtk.InputPurpose.NUMBER,
-            });
-            minRow.connect('notify::text', () => {
-                edits.min_value = parseFloat(minRow.text) || 0;
-                onConfigChanged();
-            });
             configGroup.add(minRow);
-
-            const maxRow = new Adw.EntryRow({
-                title: 'Max Value',
-                text: String(def.max_value || 10),
-                input_purpose: Gtk.InputPurpose.NUMBER,
-            });
-            maxRow.connect('notify::text', () => {
-                edits.max_value = parseFloat(maxRow.text) || 10;
-                onConfigChanged();
-            });
             configGroup.add(maxRow);
-
-            // Unit of Measurement
-            const unitRow = new Adw.EntryRow({
-                title: 'Unit',
-                text: def.unit || '',
-            });
-            unitRow.connect('notify::text', () => {
-                edits.unit = unitRow.text;
-                onConfigChanged();
-            });
             configGroup.add(unitRow);
+
+            try {
+                const bytes = Gio.resources_lookup_data('/com/github/madcapjake/Villepreux/data/parameters.json', Gio.ResourceLookupFlags.NONE);
+                const standardParams = JSON.parse(new TextDecoder().decode(bytes.toArray()));
+                const filteredParams = standardParams.filter(p => p.tank_type === this.tank.type || p.tank_type === 'Universal');
+
+                if (filteredParams.length > 0) {
+                    const popover = new Gtk.Popover({
+                        position: Gtk.PositionType.BOTTOM,
+                        has_arrow: false,
+                        autohide: true,
+                    });
+                    popover.set_parent(nameRow);
+
+                    const listBox = new Gtk.ListBox({ selection_mode: Gtk.SelectionMode.NONE });
+                    listBox.add_css_class('background');
+
+                    filteredParams.forEach(p => {
+                        const row = new Adw.ActionRow({
+                            title: p.param_name,
+                            activatable: true
+                        });
+                        row.connect('activated', () => {
+                            nameRow.text = p.param_name;
+                            unitRow.text = p.param_unit;
+                            minRow.text = String(p.param_min);
+                            maxRow.text = String(p.param_max);
+                            popover.popdown();
+                        });
+                        listBox.append(row);
+                    });
+
+                    const scroll = new Gtk.ScrolledWindow({
+                        min_content_height: 140, // about 2.5 rows (56px each roughly)
+                        max_content_height: 200,
+                        hscrollbar_policy: Gtk.PolicyType.NEVER,
+                        vscrollbar_policy: Gtk.PolicyType.AUTOMATIC,
+                    });
+                    scroll.set_child(listBox);
+                    popover.set_child(scroll);
+
+                    nameRow.connect('notify::has-focus', () => {
+                        if (nameRow.has_focus && isNew) {
+                            if (!popover.get_visible()) {
+                                popover.width_request = nameRow.get_allocated_width();
+                                popover.popup();
+                            }
+                        } else if (!nameRow.has_focus) {
+                            // Close popup if focus lost from both nameRow and popover descendants
+                            // For simplicity, autohide=true handles outside clicks anyway.
+                        }
+                    });
+
+                    // Update width on resize if visible
+                    nameRow.connect('notify::allocated-width', () => {
+                        if (popover.get_visible()) {
+                            popover.width_request = nameRow.get_allocated_width();
+                        }
+                    });
+
+                    dropBtn.connect('clicked', () => {
+                        if (isNew) {
+                            if (!popover.get_visible()) {
+                                popover.width_request = nameRow.get_allocated_width();
+                                popover.popup();
+                            } else {
+                                popover.popdown();
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to load generic parameters:", e);
+            }
 
             // Graph Color
             const colorDialog = new Gtk.ColorDialog();

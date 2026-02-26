@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
   <gresource prefix="/com/github/madcapjake/Villepreux">
+    <file alias="data/parameters.json">../data/parameters.json</file>
     <file>main.js</file>
     <file>window.js</file>
     <file>database.js</file>
