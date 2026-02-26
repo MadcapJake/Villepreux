@@ -9,6 +9,9 @@ import Pango from 'gi://Pango';
 import * as DB from '../database.js';
 import { ImageHandler } from '../utils/image_handler.js';
 import { getLivestockCategoryIcon } from '../utils/icons.js';
+import { LivestockUpdateDialog } from './LivestockUpdateDialog.js';
+import { MoveLivestockDialog } from './MoveLivestockDialog.js';
+import { LivestockUpdateDetailDialog } from './LivestockUpdateDetailDialog.js';
 
 export const LivestockView = GObject.registerClass(
     class LivestockView extends Adw.Bin {
@@ -242,7 +245,7 @@ export const LivestockView = GObject.registerClass(
         }
 
         openAddLivestock() {
-            this._navigateToDetail({
+            this._navigateToAdd({
                 tank_id: this.tank.id,
                 name: '',
                 scientific_name: '',
@@ -253,15 +256,285 @@ export const LivestockView = GObject.registerClass(
                 purchase_date: '',
                 cost: 0,
                 notes: '',
-                status: 'Alive'
+                status: 'Alive',
+                measurable1_label: '',
+                measurable1_unit: '',
+                measurable2_label: '',
+                measurable2_unit: ''
             });
         }
 
         _navigateToDetail(item) {
+            if (!item.id) {
+                return this._navigateToAdd(item);
+            }
+
+            const detailPage = new Adw.NavigationPage({
+                title: item.name,
+                tag: 'detail',
+            });
+
+            const scroll = new Gtk.ScrolledWindow({
+                hscrollbar_policy: Gtk.PolicyType.NEVER,
+            });
+
+            const clamp = new Adw.Clamp({
+                maximum_size: 800,
+                margin_top: 24,
+                margin_bottom: 24,
+                margin_start: 12,
+                margin_end: 12,
+            });
+
+            const mainBox = new Gtk.Box({
+                orientation: Gtk.Orientation.VERTICAL,
+                spacing: 24,
+            });
+
+            // --- A. The Identity Header ---
+            const headerBox = new Gtk.Box({
+                orientation: Gtk.Orientation.VERTICAL,
+                spacing: 12,
+                halign: Gtk.Align.CENTER
+            });
+
+            const heroImg = Gtk.Picture.new();
+            heroImg.set_content_fit(Gtk.ContentFit.COVER);
+            heroImg.can_shrink = true;
+            heroImg.height_request = 160;
+            heroImg.width_request = 160;
+            heroImg.css_classes = ['card'];
+            // Rounded corners on the hero image? We can use an avatar or just styling
+
+            if (item.image_path && item.image_path !== 'Alive' && item.image_path !== 'Deceased') {
+                const fullPath = ImageHandler.getImagePath(item.image_path);
+                heroImg.set_filename(fullPath);
+            } else {
+                heroImg.set_filename(null);
+                // Fallback can be an icon, but picture works ok empty, maybe add fallback icon
+            }
+
+            const commonNameLabel = new Gtk.Label({
+                label: item.name || 'Unnamed',
+                css_classes: ['title-1'],
+                halign: Gtk.Align.CENTER,
+            });
+
+            const scientificNameLabel = new Gtk.Label({
+                label: item.scientific_name || item.type || 'Unknown Species',
+                css_classes: ['dim-label'],
+                halign: Gtk.Align.CENTER,
+            });
+
+            headerBox.append(heroImg);
+            headerBox.append(commonNameLabel);
+            headerBox.append(scientificNameLabel);
+            mainBox.append(headerBox);
+
+            // --- B. The Quick Actions Bar ---
+            const quickActionsBox = new Gtk.Box({
+                orientation: Gtk.Orientation.HORIZONTAL,
+                spacing: 12,
+                halign: Gtk.Align.CENTER
+            });
+
+            if (item.status === 'Alive') {
+                const editBtn = new Gtk.Button({
+                    label: 'Edit',
+                    css_classes: ['pill'],
+                });
+                editBtn.connect('clicked', () => {
+                    this._navigateToAdd(item);
+                });
+
+                const moveBtn = new Gtk.Button({
+                    label: 'Move Tank',
+                    css_classes: ['pill'],
+                });
+                moveBtn.connect('clicked', () => {
+                    const dialog = new MoveLivestockDialog(this.get_root(), item);
+                    dialog.transient_for = this.get_root();
+                    dialog.connect('livestock-moved', () => {
+                        this._refreshGrid();
+                        this._navView.pop();
+                    });
+                    dialog.present(this.get_root());
+                });
+
+                const deceasedBtn = new Gtk.Button({
+                    label: 'Mark Deceased / Rehome',
+                    css_classes: ['pill'],
+                });
+                deceasedBtn.connect('clicked', () => {
+                    const dialog = new Adw.MessageDialog({
+                        heading: 'Update Status',
+                        body: 'Are you sure you want to mark this entity as no longer present in any of your tanks?',
+                    });
+                    if (this.get_root()) dialog.transient_for = this.get_root();
+                    dialog.add_response('cancel', 'Cancel');
+                    dialog.add_response('deceased', 'Deceased');
+                    dialog.add_response('rehomed', 'Rehomed');
+                    dialog.set_response_appearance('deceased', Adw.ResponseAppearance.DESTRUCTIVE);
+
+                    dialog.connect('response', (dlg, response) => {
+                        if (response === 'deceased' || response === 'rehomed') {
+                            item.status = response === 'deceased' ? 'Deceased' : 'Rehomed';
+                            DB.upsertLivestock(item);
+                            this._refreshGrid();
+                            this._navView.pop();
+                        }
+                    });
+                    dialog.present(this.get_root());
+                });
+
+                quickActionsBox.append(editBtn);
+                quickActionsBox.append(moveBtn);
+                quickActionsBox.append(deceasedBtn);
+                mainBox.append(quickActionsBox);
+            } else {
+                const banner = new Adw.Banner({
+                    title: `Status: ${item.status}`,
+                    button_label: '',
+                    revealed: true
+                });
+                mainBox.append(banner);
+            }
+
+            // --- C. Core Details ---
+            const coreGroup = new Adw.PreferencesGroup({ title: 'Core Details' });
+
+            const categoryRow = new Adw.ActionRow({
+                title: 'Category',
+                subtitle: item.type || 'Unknown',
+            });
+            coreGroup.add(categoryRow);
+
+            const quantityRow = new Adw.ActionRow({
+                title: 'Quantity',
+                subtitle: String(item.quantity || 1),
+            });
+            coreGroup.add(quantityRow);
+
+            const acquisitionRow = new Adw.ExpanderRow({
+                title: 'Acquisition Details',
+            });
+
+            const introRow = new Adw.ActionRow({ title: 'Introduced On', subtitle: item.introduced_date || 'Unknown' });
+            acquisitionRow.add_row(introRow);
+
+            const sourceRow = new Adw.ActionRow({ title: 'Purchased From', subtitle: item.source || 'Unknown' });
+            acquisitionRow.add_row(sourceRow);
+
+            const purchasedRow = new Adw.ActionRow({ title: 'Purchased On', subtitle: item.purchase_date || 'Unknown' });
+            acquisitionRow.add_row(purchasedRow);
+
+            const costRow = new Adw.ActionRow({ title: 'Cost', subtitle: `$${(item.cost || 0).toFixed(2)}` });
+            acquisitionRow.add_row(costRow);
+
+            coreGroup.add(acquisitionRow);
+            mainBox.append(coreGroup);
+
+            // --- D. The Timeline Feed ---
+            const feedGroup = new Adw.PreferencesGroup({ title: 'Timeline' });
+
+            const addUpdateBtn = new Gtk.Button({
+                label: 'Add Update',
+                css_classes: ['suggested-action'],
+                margin_bottom: 12
+            });
+            feedGroup.set_header_suffix(addUpdateBtn);
+
+            let feedRows = [];
+
+            const refreshFeed = () => {
+                feedRows.forEach(r => feedGroup.remove(r));
+                feedRows = [];
+
+                const updates = DB.getLivestockUpdates(item.id);
+                if (updates.length === 0) {
+                    const emptyRow = new Adw.ActionRow({
+                        title: 'No updates yet. Log growth or observations over time.',
+                    });
+                    emptyRow.set_activatable(false);
+                    feedGroup.add(emptyRow);
+                    feedRows.push(emptyRow);
+                    return;
+                }
+
+                updates.forEach(upd => {
+                    const noteText = upd.note ? upd.note.replace(/\n+/g, ' ') : 'No notes';
+                    const row = new Adw.ActionRow({
+                        title: upd.log_date,
+                        subtitle: noteText,
+                        subtitle_lines: 2,
+                        activatable: true,
+                    });
+
+                    // Measurements
+                    let measureText = '';
+                    if (upd.measurable1 !== null && item.measurable1_label) {
+                        measureText += `${upd.measurable1} ${item.measurable1_unit || ''} `;
+                    }
+                    if (upd.measurable2 !== null && item.measurable2_label) {
+                        measureText += `${upd.measurable2} ${item.measurable2_unit || ''}`;
+                    }
+                    if (measureText.trim().length > 0) {
+                        const measureLbl = new Gtk.Label({
+                            label: measureText.trim(),
+                            css_classes: ['numeric', 'dim-label'],
+                            margin_end: 12
+                        });
+                        row.add_suffix(measureLbl);
+                    }
+
+                    if (upd.image_filename) {
+                        const fullPath = ImageHandler.getImagePath(upd.image_filename);
+                        const pic = Gtk.Picture.new();
+                        pic.set_content_fit(Gtk.ContentFit.COVER);
+                        pic.height_request = 48;
+                        pic.width_request = 48;
+                        pic.can_shrink = true;
+                        pic.set_filename(fullPath);
+                        pic.css_classes = ['card'];
+                        row.add_suffix(pic);
+                    }
+
+                    row.connect('activated', () => {
+                        const dialog = new LivestockUpdateDetailDialog(this.get_root(), item, upd);
+                        dialog.connect('update-deleted', () => refreshFeed());
+                        dialog.present(this.get_root());
+                    });
+
+                    feedGroup.add(row);
+                    feedRows.push(row);
+                });
+            };
+
+            refreshFeed();
+
+            addUpdateBtn.connect('clicked', () => {
+                const dialog = new LivestockUpdateDialog(item);
+                dialog.transient_for = this.get_root();
+                dialog.connect('update-logged', () => {
+                    refreshFeed();
+                });
+                dialog.present(this.get_root());
+            });
+
+            mainBox.append(feedGroup);
+
+            clamp.set_child(mainBox);
+            scroll.set_child(clamp);
+            detailPage.set_child(scroll);
+
+            this._navView.push(detailPage);
+        }
+
+        _navigateToAdd(item) {
             const isNew = !item.id;
             const detailPage = new Adw.NavigationPage({
-                title: isNew ? 'New Inhabitant' : item.name,
-                tag: 'detail',
+                title: isNew ? 'New Inhabitant' : 'Edit ' + item.name,
+                tag: 'edit-' + (item.id || 'new'),
             });
 
             const scroll = new Gtk.ScrolledWindow({
@@ -345,7 +618,7 @@ export const LivestockView = GObject.registerClass(
                     }
                 });
 
-                dialog.present();
+                dialog.present(this.get_root());
             });
 
             imgBox.set_child(pic);
@@ -410,7 +683,21 @@ export const LivestockView = GObject.registerClass(
                 try {
                     DB.upsertLivestock(edits);
                     this._refreshGrid();
-                    this._navView.pop();
+                    this._navView.pop(); // Pop the edit page
+
+                    // If it was an edit, we also need to close the stale detail page and push a fresh one
+                    if (!isNew) {
+                        // Determine if the previous page was actually the detail page for this item
+                        const currentPage = this._navView.get_visible_page();
+                        if (currentPage && currentPage.tag === 'detail') {
+                            this._navView.pop();
+                        }
+
+                        // Re-fetch the modified item from the DB or just pass edits
+                        // We'll trust our edits object, but best to re-fetch if possible.
+                        // since we just saved, we can just push detail using the edits object (which now has the DB updates)
+                        this._navigateToDetail(edits);
+                    }
                 } catch (e) {
                     console.error("Save livestock failed", e);
                 }
@@ -517,19 +804,43 @@ export const LivestockView = GObject.registerClass(
             addDateEntry('Purchased On', 'purchase_date');
             addEntry('Cost', 'cost', Gtk.InputPurpose.NUMBER);
             addEntry('Notes', 'notes');
+            addEntry('Measurable 1 Label (e.g. Length)', 'measurable1_label');
+            addEntry('Measurable 1 Unit (e.g. cm)', 'measurable1_unit');
+            addEntry('Measurable 2 Label (e.g. Weight)', 'measurable2_label');
+            addEntry('Measurable 2 Unit (e.g. g)', 'measurable2_unit');
 
             mainBox.append(infoGroup);
 
+            const dangerGroup = new Adw.PreferencesGroup();
+
             if (!isNew) {
-                const dangerGroup = new Adw.PreferencesGroup();
                 const delBtn = new Gtk.Button({
                     label: 'Delete Inhabitant',
                     css_classes: ['destructive-action'],
                 });
                 delBtn.connect('clicked', () => {
-                    DB.deleteLivestock(item.id);
-                    this._refreshGrid();
-                    this._navView.pop();
+                    const dialog = new Adw.MessageDialog({
+                        heading: 'Delete Inhabitant',
+                        body: 'Are you sure you want to permanently delete this inhabitant? This action cannot be undone.',
+                    });
+                    if (this.get_root()) dialog.transient_for = this.get_root();
+                    dialog.add_response('cancel', 'Cancel');
+                    dialog.add_response('delete', 'Delete');
+                    dialog.set_response_appearance('delete', Adw.ResponseAppearance.DESTRUCTIVE);
+
+                    dialog.connect('response', (dlg, response) => {
+                        if (response === 'delete') {
+                            DB.deleteLivestock(item.id);
+                            this._refreshGrid();
+                            // Pop out of edit
+                            this._navView.pop();
+                            // Identify if we need to pop again from detail profile (we do if it is an edit because we opened _navigateToDetail, then _navigateToAdd)
+                            if (this._navView.get_visible_page().tag === 'detail') {
+                                this._navView.pop();
+                            }
+                        }
+                    });
+                    dialog.present(this.get_root());
                 });
                 dangerGroup.add(delBtn);
                 mainBox.append(dangerGroup);

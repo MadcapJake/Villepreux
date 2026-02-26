@@ -101,6 +101,16 @@ function _createTables() {
             note TEXT,
             FOREIGN KEY(livestock_id) REFERENCES livestock(id)
         )`,
+        `CREATE TABLE IF NOT EXISTS livestock_updates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            livestock_id INTEGER,
+            log_date TEXT,
+            note TEXT,
+            measurable1 REAL,
+            measurable2 REAL,
+            image_filename TEXT,
+            FOREIGN KEY(livestock_id) REFERENCES livestock(id)
+        )`,
         `CREATE TABLE IF NOT EXISTS parameter_definitions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tank_id INTEGER,
@@ -155,6 +165,19 @@ function _createTables() {
     } catch (e) {
         // Ignore duplicate column errors if it already exists
     }
+
+    try {
+        _connection.execute_non_select_command(`ALTER TABLE livestock ADD COLUMN measurable1_label TEXT`);
+    } catch (e) { }
+    try {
+        _connection.execute_non_select_command(`ALTER TABLE livestock ADD COLUMN measurable1_unit TEXT`);
+    } catch (e) { }
+    try {
+        _connection.execute_non_select_command(`ALTER TABLE livestock ADD COLUMN measurable2_label TEXT`);
+    } catch (e) { }
+    try {
+        _connection.execute_non_select_command(`ALTER TABLE livestock ADD COLUMN measurable2_unit TEXT`);
+    } catch (e) { }
 }
 
 export function createTank(tankData) {
@@ -255,7 +278,7 @@ export function deleteParameterDefinition(id) {
 export function getLivestock(tankId) {
     if (!_connection) return [];
     try {
-        const sql = `SELECT id, tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status FROM livestock WHERE tank_id = ${tankId} ORDER BY name ASC`;
+        const sql = `SELECT id, tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status, measurable1_label, measurable1_unit, measurable2_label, measurable2_unit FROM livestock WHERE tank_id = ${tankId} ORDER BY name ASC`;
         console.log(`[DB] getLivestock SQL: ${sql}`);
         const dm = _connection.execute_select_command(sql);
         const numRows = dm.get_n_rows();
@@ -274,7 +297,11 @@ export function getLivestock(tankId) {
                 cost: dm.get_value_at(9, i),
                 notes: dm.get_value_at(10, i),
                 image_path: dm.get_value_at(11, i),
-                status: dm.get_value_at(12, i)
+                status: dm.get_value_at(12, i),
+                measurable1_label: dm.get_value_at(13, i),
+                measurable1_unit: dm.get_value_at(14, i),
+                measurable2_label: dm.get_value_at(15, i),
+                measurable2_unit: dm.get_value_at(16, i)
             });
         }
         return items;
@@ -301,6 +328,10 @@ export function upsertLivestock(item) {
         const notes = item.notes || '';
         const image_path = item.image_path || '';
         const status = item.status || 'Alive';
+        const measurable1_label = item.measurable1_label ? item.measurable1_label.replace(/'/g, "''") : '';
+        const measurable1_unit = item.measurable1_unit ? item.measurable1_unit.replace(/'/g, "''") : '';
+        const measurable2_label = item.measurable2_label ? item.measurable2_label.replace(/'/g, "''") : '';
+        const measurable2_unit = item.measurable2_unit ? item.measurable2_unit.replace(/'/g, "''") : '';
 
         if (item.id) {
             // Update
@@ -315,12 +346,16 @@ export function upsertLivestock(item) {
                 cost=${cost}, 
                 notes='${notes}', 
                 image_path='${image_path}', 
-                status='${status}' 
+                status='${status}',
+                measurable1_label='${measurable1_label}',
+                measurable1_unit='${measurable1_unit}',
+                measurable2_label='${measurable2_label}',
+                measurable2_unit='${measurable2_unit}'
                 WHERE id=${item.id}`;
         } else {
             // Insert
-            sql = `INSERT INTO livestock (tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status) 
-                VALUES (${item.tank_id}, '${name}', '${scientific_name}', '${type}', '${introduced_date}', ${quantity}, '${source}', '${purchase_date}', ${cost}, '${notes}', '${image_path}', '${status}')`;
+            sql = `INSERT INTO livestock (tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status, measurable1_label, measurable1_unit, measurable2_label, measurable2_unit) 
+                VALUES (${item.tank_id}, '${name}', '${scientific_name}', '${type}', '${introduced_date}', ${quantity}, '${source}', '${purchase_date}', ${cost}, '${notes}', '${image_path}', '${status}', '${measurable1_label}', '${measurable1_unit}', '${measurable2_label}', '${measurable2_unit}')`;
         }
         _connection.execute_non_select_command(sql);
     } catch (e) {
@@ -336,6 +371,60 @@ export function deleteLivestock(id) {
         _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to delete livestock:', e);
+    }
+}
+
+export function getLivestockUpdates(livestockId) {
+    if (!_connection) return [];
+    try {
+        const sql = `SELECT id, livestock_id, log_date, note, measurable1, measurable2, image_filename FROM livestock_updates WHERE livestock_id = ${livestockId} ORDER BY log_date DESC, id DESC`;
+        const dm = _connection.execute_select_command(sql);
+        const numRows = dm.get_n_rows();
+        const items = [];
+        for (let i = 0; i < numRows; i++) {
+            items.push({
+                id: dm.get_value_at(0, i),
+                livestock_id: dm.get_value_at(1, i),
+                log_date: dm.get_value_at(2, i),
+                note: dm.get_value_at(3, i),
+                measurable1: dm.get_value_at(4, i),
+                measurable2: dm.get_value_at(5, i),
+                image_filename: dm.get_value_at(6, i)
+            });
+        }
+        return items;
+    } catch (e) {
+        console.error('Failed to get livestock updates:', e);
+        return [];
+    }
+}
+
+export function insertLivestockUpdate(data) {
+    if (!_connection) return null;
+    try {
+        const note = data.note ? data.note.replace(/'/g, "''") : '';
+        const img = data.image_filename ? `'${data.image_filename}'` : 'NULL';
+        const m1 = typeof data.measurable1 === 'number' ? data.measurable1 : 'NULL';
+        const m2 = typeof data.measurable2 === 'number' ? data.measurable2 : 'NULL';
+        const logDate = data.log_date || new Date().toISOString().split('T')[0];
+
+        const sql = `INSERT INTO livestock_updates (livestock_id, log_date, note, measurable1, measurable2, image_filename) 
+                     VALUES (${data.livestock_id}, '${logDate}', '${note}', ${m1}, ${m2}, ${img})`;
+        _connection.execute_non_select_command(sql);
+        return true;
+    } catch (e) {
+        console.error('Failed to insert livestock update:', e);
+        return false;
+    }
+}
+
+export function deleteLivestockUpdate(id) {
+    if (!_connection) return;
+    try {
+        const sql = `DELETE FROM livestock_updates WHERE id=${id}`;
+        _connection.execute_non_select_command(sql);
+    } catch (e) {
+        console.error('Failed to delete livestock update:', e);
     }
 }
 
