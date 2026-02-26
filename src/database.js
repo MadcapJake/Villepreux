@@ -352,12 +352,21 @@ export function upsertLivestock(item) {
                 measurable2_label='${measurable2_label}',
                 measurable2_unit='${measurable2_unit}'
                 WHERE id=${item.id}`;
+            _connection.execute_non_select_command(sql);
+            return item.id;
         } else {
             // Insert
             sql = `INSERT INTO livestock (tank_id, name, scientific_name, type, introduced_date, quantity, source, purchase_date, cost, notes, image_path, status, measurable1_label, measurable1_unit, measurable2_label, measurable2_unit) 
                 VALUES (${item.tank_id}, '${name}', '${scientific_name}', '${type}', '${introduced_date}', ${quantity}, '${source}', '${purchase_date}', ${cost}, '${notes}', '${image_path}', '${status}', '${measurable1_label}', '${measurable1_unit}', '${measurable2_label}', '${measurable2_unit}')`;
+            _connection.execute_non_select_command(sql);
+
+            const rSql = "SELECT last_insert_rowid()";
+            const dm = _connection.execute_select_command(rSql);
+            if (dm.get_n_rows() > 0) {
+                return dm.get_value_at(0, 0);
+            }
+            return null;
         }
-        _connection.execute_non_select_command(sql);
     } catch (e) {
         console.error('Failed to upsert livestock:', e);
         throw e;

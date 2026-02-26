@@ -167,6 +167,8 @@ export const MoveLivestockDialog = GObject.registerClass(
             moveBtn.connect('clicked', () => {
                 if (selectedTank) {
                     const moveQuantity = this.quantitySpin.get_value_as_int();
+                    const origTank = tanks.find(t => t.id === this.livestock.tank_id);
+                    const origTankName = origTank ? origTank.name : 'Unknown';
 
                     if (moveQuantity < this.maxQuantity) {
                         // Partial Move - Create a copy for the destination tank
@@ -179,7 +181,23 @@ export const MoveLivestockDialog = GObject.registerClass(
                         delete newLivestock.id; // DB will auto-increment
                         newLivestock.tank_id = selectedTank.id;
                         newLivestock.quantity = moveQuantity;
-                        DB.upsertLivestock(newLivestock);
+                        const newId = DB.upsertLivestock(newLivestock);
+
+                        // Log update for old record
+                        DB.insertLivestockUpdate({
+                            livestock_id: this.livestock.id,
+                            log_date: new Date().toISOString().split('T')[0],
+                            note: `Livestock '${this.livestock.name}' was partially moved (qty: ${moveQuantity}) from ${origTankName} to ${selectedTank.name}`
+                        });
+
+                        // Log update for new record
+                        if (newId) {
+                            DB.insertLivestockUpdate({
+                                livestock_id: newId,
+                                log_date: new Date().toISOString().split('T')[0],
+                                note: `Livestock '${this.livestock.name}' was partially moved (qty: ${moveQuantity}) from ${origTankName} to ${selectedTank.name}`
+                            });
+                        }
 
                         // Notify user that timeline doesn't move
                         if (this._parentWindow && typeof this._parentWindow.addToast === 'function') {
@@ -206,7 +224,7 @@ export const MoveLivestockDialog = GObject.registerClass(
                         DB.insertLivestockUpdate({
                             livestock_id: this.livestock.id,
                             log_date: new Date().toISOString().split('T')[0],
-                            note: `Moved to tank: ${selectedTank.name}`
+                            note: `Livestock '${this.livestock.name}' was fully moved from ${origTankName} to ${selectedTank.name}`
                         });
                     }
 
