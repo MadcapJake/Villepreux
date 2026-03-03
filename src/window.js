@@ -198,6 +198,7 @@ export const VillepreuxWindow = GObject.registerClass(
                     this.set_title('Villepreux');
                     this._contentHeader.set_title_widget(null);
                     this._contentView.set_content(this._statusPage);
+                    this._splitView.set_show_sidebar(false);
                 }
             }
         }

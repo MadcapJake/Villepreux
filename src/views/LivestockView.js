@@ -547,7 +547,13 @@ export const LivestockView = GObject.registerClass(
                         pic.height_request = 48;
                         pic.width_request = 48;
                         pic.can_shrink = true;
-                        pic.set_filename(fullPath);
+                        try {
+                            const pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(fullPath, 48, 48, false);
+                            const texture = Gdk.Texture.new_for_pixbuf(pixbuf);
+                            pic.set_paintable(texture);
+                        } catch (e) {
+                            pic.set_filename(fullPath); // Fallback
+                        }
                         pic.css_classes = ['card'];
                         row.add_suffix(pic);
                     }

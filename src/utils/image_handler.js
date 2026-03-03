@@ -16,7 +16,7 @@ export class ImageHandler {
             }
 
             // Load image via GdkPixbuf
-            const pixbuf = GdkPixbuf.Pixbuf.new_from_file(gioFile.get_path());
+            let pixbuf = GdkPixbuf.Pixbuf.new_from_file(gioFile.get_path());
             let finalPixbuf = pixbuf;
 
             // Scale down if > 1920
@@ -45,6 +45,10 @@ export class ImageHandler {
             // Save it
             finalPixbuf.savev(finalPath, 'jpeg', ['quality'], ['85']);
             console.log(`[ImageHandler] Image saved successfully to: ${finalPath}`);
+
+            // Free C-memory hints
+            pixbuf = null;
+            finalPixbuf = null;
 
             return filename;
         } catch (e) {
